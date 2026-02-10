@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +35,7 @@ type IPAMConfigController struct {
 	PlatformCluster *clusters.Cluster
 	ProviderName    string
 	er              events.EventRecorder
+	lastRefreshTime time.Time
 }
 
 var _ reconcile.Reconciler = &IPAMConfigController{}
@@ -43,6 +45,7 @@ func NewIPAMConfigController(platformCluster *clusters.Cluster, providerName str
 		PlatformCluster: platformCluster,
 		ProviderName:    providerName,
 		er:              er,
+		lastRefreshTime: time.Now(),
 	}
 }
 
@@ -51,7 +54,7 @@ func (c *IPAMConfigController) Reconcile(ctx context.Context, req reconcile.Requ
 	ctx = logging.NewContext(ctx, log)
 	log.Info("Starting reconcile")
 
-	cfg, err := c.reconcile(ctx, req)
+	cfg, rr, err := c.reconcile(ctx, req)
 	if c.er != nil {
 		if err != nil {
 			if cfg != nil {
@@ -64,15 +67,15 @@ func (c *IPAMConfigController) Reconcile(ctx context.Context, req reconcile.Requ
 		}
 	}
 
-	return reconcile.Result{}, err
+	return rr, err
 }
 
-func (c *IPAMConfigController) reconcile(ctx context.Context, req reconcile.Request) (*ipamv1alpha1.IPAMConfig, error) {
+func (c *IPAMConfigController) reconcile(ctx context.Context, req reconcile.Request) (*ipamv1alpha1.IPAMConfig, reconcile.Result, error) {
 	log := logging.FromContextOrPanic(ctx)
 
 	if req.Name != c.ProviderName {
 		log.Info("Skipping reconciliation because the config belongs to a different instance of this platform service", "providerName", c.ProviderName)
-		return nil, nil
+		return nil, reconcile.Result{}, nil
 	}
 
 	// fetch config
@@ -82,7 +85,7 @@ func (c *IPAMConfigController) reconcile(ctx context.Context, req reconcile.Requ
 			log.Info("Config resource not found, removing config from internal storage")
 			shared.SetConfig(nil)
 		}
-		return nil, fmt.Errorf("error fetching GardenerIPAMConfig %s: %w", req.String(), err)
+		return nil, reconcile.Result{}, fmt.Errorf("error fetching GardenerIPAMConfig %s: %w", req.String(), err)
 	}
 
 	// handle operation annotation
@@ -92,11 +95,11 @@ func (c *IPAMConfigController) reconcile(ctx context.Context, req reconcile.Requ
 			switch op {
 			case openmcpconst.OperationAnnotationValueIgnore:
 				log.Info("Ignoring resource due to ignore operation annotation")
-				return nil, nil
+				return nil, reconcile.Result{}, nil
 			case openmcpconst.OperationAnnotationValueReconcile:
 				log.Debug("Removing reconcile operation annotation from resource")
 				if err := ctrlutils.EnsureAnnotation(ctx, c.PlatformCluster.Client(), cfg, openmcpconst.OperationAnnotation, "", true, ctrlutils.DELETE); err != nil {
-					return nil, fmt.Errorf("error removing operation annotation: %w", err)
+					return nil, reconcile.Result{}, fmt.Errorf("error removing operation annotation: %w", err)
 				}
 			}
 		}
@@ -112,7 +115,7 @@ func (c *IPAMConfigController) reconcile(ctx context.Context, req reconcile.Requ
 			}
 		}
 		if errs != nil {
-			return nil, fmt.Errorf("config is invalid: %w", errs)
+			return nil, reconcile.Result{}, fmt.Errorf("config is invalid: %w", errs)
 		}
 
 		// compare to old config
@@ -122,7 +125,7 @@ func (c *IPAMConfigController) reconcile(ctx context.Context, req reconcile.Requ
 			log.Info("Injection rules have changed, queuing all clusters that match any injection rule")
 			affectedClusters, err := shared.FetchRelevantClusters(ctx, cfg, c.PlatformCluster)
 			if err != nil {
-				return nil, fmt.Errorf("error fetching affected clusters: %w", err)
+				return nil, reconcile.Result{}, fmt.Errorf("error fetching affected clusters: %w", err)
 			}
 			for _, cluster := range affectedClusters {
 				shared.ClusterWatch <- event.GenericEvent{
@@ -143,7 +146,22 @@ func (c *IPAMConfigController) reconcile(ctx context.Context, req reconcile.Requ
 	}
 
 	log.Info("Config refreshed")
-	return cfg, nil
+
+	if cfg.Spec.InternalStateRefreshCycleDuration != nil && cfg.Spec.InternalStateRefreshCycleDuration.Duration > 0 && time.Now().After(c.lastRefreshTime.Add(cfg.Spec.InternalStateRefreshCycleDuration.Duration)) {
+		// refresh internal state by reloading it from the cluster state
+		if err := shared.RestoreIPAMFromClusterState(ctx, c.PlatformCluster); err != nil {
+			return nil, reconcile.Result{}, fmt.Errorf("error refreshing internal IPAM state: %w", err)
+		}
+		c.lastRefreshTime = time.Now()
+	}
+	rr := reconcile.Result{}
+	if cfg.Spec.InternalStateRefreshCycleDuration != nil && cfg.Spec.InternalStateRefreshCycleDuration.Duration > 0 {
+		rr.RequeueAfter = cfg.Spec.InternalStateRefreshCycleDuration.Duration - time.Since(c.lastRefreshTime) + (1 * time.Second) // add a small buffer to ensure that we requeue after the duration has passed
+		if rr.RequeueAfter <= 0 {
+			rr.RequeueAfter = 1 * time.Second
+		}
+	}
+	return cfg, rr, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

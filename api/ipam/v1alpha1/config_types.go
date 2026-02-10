@@ -14,6 +14,10 @@ type IPAMConfigSpec struct {
 
 	// InjectionRules defines the rules for injecting CIDRs into Clusters.
 	InjectionRules []CIDRInjection `json:"injectionRules,omitempty"`
+
+	// InternalStateRefreshCycleDuration defines the duration after which the internal IPAM state is discarded and restored from the cluster state again.
+	// If nil or zero, this functionality is disabled.
+	InternalStateRefreshCycleDuration *metav1.Duration `json:"internalStateRefreshCycleDuration,omitempty"`
 }
 
 // +kubebuilder:validation:Pattern=`^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}\/(3[0-2]|(1|2|)[0-9])$`
