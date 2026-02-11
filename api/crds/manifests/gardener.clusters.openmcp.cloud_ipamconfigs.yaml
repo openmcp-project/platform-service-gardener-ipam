@@ -201,6 +201,11 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              internalStateRefreshCycleDuration:
+                description: |-
+                  InternalStateRefreshCycleDuration defines the duration after which the internal IPAM state is discarded and restored from the cluster state again.
+                  If nil or zero, this functionality is disabled.
+                type: string
               parentCIDRs:
                 additionalProperties:
                   items:

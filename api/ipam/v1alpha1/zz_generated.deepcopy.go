@@ -5,6 +5,7 @@
 package v1alpha1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -146,6 +147,11 @@ func (in *IPAMConfigSpec) DeepCopyInto(out *IPAMConfigSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.InternalStateRefreshCycleDuration != nil {
+		in, out := &in.InternalStateRefreshCycleDuration, &out.InternalStateRefreshCycleDuration
+		*out = new(v1.Duration)
+		**out = **in
 	}
 }
 

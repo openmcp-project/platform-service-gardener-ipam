@@ -191,8 +191,8 @@ github.com/openmcp-project/controller-utils v0.25.2 h1:Q+niT4DXFK0ObxcxgLQCSGG9C
 github.com/openmcp-project/controller-utils v0.25.2/go.mod h1:F26KaZ/OIlsUW3NcPecdzznDVlUjJWet+AIYedTa9hc=
 github.com/openmcp-project/controller-utils/api v0.25.2 h1:YToD4plpAuUYLb4wYS0CUvplE8rDNCeJ+jVvggiyvco=
 github.com/openmcp-project/controller-utils/api v0.25.2/go.mod h1:1m9nYieXg7z/qbOTPDMK3mnvCpFs3h5NB1S3652Bsq4=
-github.com/openmcp-project/openmcp-operator/api v0.18.1 h1:jBc0b8FxgDZR+8l+wkrLaCj/h31RYJTkdio+yIHH8hU=
-github.com/openmcp-project/openmcp-operator/api v0.18.1/go.mod h1:eI3caa7YYHXV3eD0BD/vfQLb2epxOBRgdDK4T2xr12w=
+github.com/openmcp-project/openmcp-operator/api v0.18.2-0.20260210151615-bf963d18570a h1:JYgl4eiIl6pNHsJPYER0Ob6FANAjpUR2SDKWSK4nGaw=
+github.com/openmcp-project/openmcp-operator/api v0.18.2-0.20260210151615-bf963d18570a/go.mod h1:4gGO3luVDXtyId4fBkgvxTpoxpB2/CsCaPVZpMOG1oI=
 github.com/openmcp-project/platform-service-dns/api v0.0.5 h1:6MN4WwV6//IRUl0O/5W3Cz5yj940WE6Uf5SksgbF2Kg=
 github.com/openmcp-project/platform-service-dns/api v0.0.5/go.mod h1:3lFhGA58v8fSxqEoxtn3scrF7Lur9lLLuyxJmdRnnzE=
 github.com/openmcp-project/platform-service-gardener-ipam/api v0.0.0-20260210152900-ffd012055841 h1:W+x9qApBygzuP3/2ur834nFmEDcpMOll6MiFPWGSBV8=
