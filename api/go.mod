@@ -5,14 +5,15 @@ go 1.25.6
 require (
 	github.com/fluxcd/helm-controller/api v1.4.5
 	github.com/fluxcd/source-controller/api v1.7.4
+	github.com/openmcp-project/cluster-provider-gardener/api v0.10.0
 	github.com/openmcp-project/controller-utils v0.25.2
-	github.com/openmcp-project/platform-service-dns/api v0.0.5
 )
 
 require (
 	github.com/fluxcd/pkg/apis/acl v0.9.0 // indirect
 	github.com/fluxcd/pkg/apis/kustomize v1.14.0 // indirect
 	github.com/fluxcd/pkg/apis/meta v1.23.0 // indirect
+	github.com/openmcp-project/controller-utils/api v0.25.2 // indirect
 )
 
 require (

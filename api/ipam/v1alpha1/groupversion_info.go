@@ -1,15 +1,15 @@
 // +kubebuilder:object:generate=true
-// +groupName=gardener-ipam.openmcp.cloud
+// +groupName=gardener.clusters.openmcp.cloud
 package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 
-	apiconst "github.com/openmcp-project/openmcp-operator/api/constants"
+	gardenv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
 )
 
-const GroupName = "gardener-ipam." + apiconst.OpenMCPGroupName
+const GroupName = gardenv1alpha1.GroupName
 
 var (
 	// GroupVersion is group version used to register these objects
