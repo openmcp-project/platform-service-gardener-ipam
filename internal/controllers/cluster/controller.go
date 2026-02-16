@@ -15,8 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	goipam "github.com/metal-stack/go-ipam"
 
@@ -506,6 +508,22 @@ func (c *IPAMClusterController) SetupWithManager(mgr ctrl.Manager) error {
 				ctrlutils.HasAnnotationPredicate(openmcpconst.OperationAnnotation, openmcpconst.OperationAnnotationValueIgnore),
 			),
 		))).
-		// TODO: this controller should also react to the owned ClusterConfig resources and listen to the shared channel for config changes
+		// watch owned ClusterConfig resources with the fitting labels
+		Owns(&gardenerv1alpha1.ClusterConfig{}, builder.WithPredicates(predicate.And(
+			ctrlutils.HasLabelPredicate(openmcpconst.ManagedByLabel, shared.ProviderName()),
+			ctrlutils.HasLabelPredicate(openmcpconst.ManagedPurposeLabel, ipamv1alpha1.ManagedPurposeLabelValue),
+			ctrlutils.HasLabelPredicate(openmcpconst.EnvironmentLabel, shared.Environment()),
+			predicate.Or(
+				ctrlutils.OnUpdatePredicate(),
+				ctrlutils.OnDeletePredicate(),
+				ctrlutils.GotAnnotationPredicate(openmcpconst.OperationAnnotation, openmcpconst.OperationAnnotationValueReconcile),
+				ctrlutils.LostAnnotationPredicate(openmcpconst.OperationAnnotation, openmcpconst.OperationAnnotationValueIgnore),
+			),
+			predicate.Not(
+				ctrlutils.HasAnnotationPredicate(openmcpconst.OperationAnnotation, openmcpconst.OperationAnnotationValueIgnore),
+			),
+		))).
+		// react to manual reconciliation triggers from the config controller
+		WatchesRawSource(source.Channel(shared.ClusterWatch, &handler.EnqueueRequestForObject{})).
 		Complete(c)
 }
