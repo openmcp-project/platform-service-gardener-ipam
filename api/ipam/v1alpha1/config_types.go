@@ -20,6 +20,7 @@ type IPAMConfigSpec struct {
 	InternalStateRefreshCycleDuration *metav1.Duration `json:"internalStateRefreshCycleDuration,omitempty"`
 }
 
+// +kubebuilder:validation:Type=string
 // +kubebuilder:validation:Pattern=`^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}\/(3[0-2]|(1|2|)[0-9])$`
 type CIDR string
 

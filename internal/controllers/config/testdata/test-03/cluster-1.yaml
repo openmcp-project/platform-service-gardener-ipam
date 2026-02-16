@@ -1,0 +1,13 @@
+apiVersion: clusters.openmcp.cloud/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-1
+  namespace: test
+  labels:
+    openmcp.cloud/test: "true"
+spec:
+  kubernetes: {}
+  profile: kind
+  purposes:
+  - test-1
+  tenancy: Shared

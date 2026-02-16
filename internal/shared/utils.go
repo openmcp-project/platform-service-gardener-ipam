@@ -51,49 +51,49 @@ func ClusterConfigLabels(cl *clustersv1alpha1.Cluster, ruleID string) map[string
 func FetchRelevantClusters(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, platformCluster *clusters.Cluster) ([]*clustersv1alpha1.Cluster, error) {
 	log := logging.FromContextOrPanic(ctx)
 
-	allClusters := &clustersv1alpha1.ClusterList{}
-	if err := platformCluster.Client().List(ctx, allClusters); err != nil {
-		return nil, fmt.Errorf("unable to list Cluster resources: %w", err)
-	}
-
 	var relevantClusters []*clustersv1alpha1.Cluster
-	for _, cluster := range allClusters.Items {
-		if cfg == nil {
-			// no config, fetch ClusterConfigs and return their owners
-			ccs, err := FetchClusterConfigs(ctx, platformCluster)
-			if err != nil {
-				return nil, fmt.Errorf("error fetching ClusterConfigs: %w", err)
+	if cfg == nil {
+		// no config, fetch ClusterConfigs and return their owners
+		ccs, err := FetchClusterConfigs(ctx, platformCluster)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching ClusterConfigs: %w", err)
+		}
+		tmp := map[string]map[string]*clustersv1alpha1.Cluster{} // cluster namespace -> cluster name -> cluster, temporary cache to avoid fetching the same cluster multiple times
+		var errs error
+		for _, cc := range ccs {
+			cName, ok := cc.Labels[ipamv1alpha1.ClusterTargetLabel]
+			if !ok {
+				log.Error(nil, "ClusterConfig is missing the cluster target label", "clusterConfig", fmt.Sprintf("%s/%s", cc.Namespace, cc.Name), "label", ipamv1alpha1.ClusterTargetLabel)
+				continue
 			}
-			tmp := map[string]map[string]*clustersv1alpha1.Cluster{} // cluster namespace -> cluster name -> cluster, temporary cache to avoid fetching the same cluster multiple times
-			var errs error
-			for _, cc := range ccs {
-				cName, ok := cc.Labels[ipamv1alpha1.ClusterTargetLabel]
-				if !ok {
-					log.Error(nil, "ClusterConfig is missing the cluster target label", "clusterConfig", fmt.Sprintf("%s/%s", cc.Namespace, cc.Name), "label", ipamv1alpha1.ClusterTargetLabel)
-					continue
-				}
-				ns, ok := tmp[cc.Namespace]
-				if !ok {
-					ns = map[string]*clustersv1alpha1.Cluster{}
-					tmp[cc.Namespace] = ns
-				}
-				if _, ok := ns[cName]; !ok { // nothing to do if the cluster is already fetched
-					c := &clustersv1alpha1.Cluster{}
-					if err := platformCluster.Client().Get(ctx, client.ObjectKey{Namespace: cc.Namespace, Name: cName}, c); err != nil {
-						if !apierrors.IsNotFound(err) {
-							errs = errors.Join(errs, fmt.Errorf("error fetching Cluster '%s' for ClusterConfig '%s/%s': %w", cName, cc.Namespace, cc.Name, err))
-						}
-					} else {
-						ns[cName] = c
+			ns, ok := tmp[cc.Namespace]
+			if !ok {
+				ns = map[string]*clustersv1alpha1.Cluster{}
+				tmp[cc.Namespace] = ns
+			}
+			if _, ok := ns[cName]; !ok { // nothing to do if the cluster is already fetched
+				c := &clustersv1alpha1.Cluster{}
+				if err := platformCluster.Client().Get(ctx, client.ObjectKey{Namespace: cc.Namespace, Name: cName}, c); err != nil {
+					if !apierrors.IsNotFound(err) {
+						errs = errors.Join(errs, fmt.Errorf("error fetching Cluster '%s' for ClusterConfig '%s/%s': %w", cName, cc.Namespace, cc.Name, err))
 					}
+				} else {
+					ns[cName] = c
 				}
 			}
-			relevantClusters = collections.AggregateMap(tmp, func(_ string, clustersInNamespace map[string]*clustersv1alpha1.Cluster, res []*clustersv1alpha1.Cluster) []*clustersv1alpha1.Cluster {
-				res = append(res, slices.Collect(maps.Values(clustersInNamespace))...)
-				return res
-			}, []*clustersv1alpha1.Cluster{})
-		} else {
-			relevantClusters = []*clustersv1alpha1.Cluster{}
+		}
+		relevantClusters = collections.AggregateMap(tmp, func(_ string, clustersInNamespace map[string]*clustersv1alpha1.Cluster, res []*clustersv1alpha1.Cluster) []*clustersv1alpha1.Cluster {
+			res = append(res, slices.Collect(maps.Values(clustersInNamespace))...)
+			return res
+		}, []*clustersv1alpha1.Cluster{})
+	} else {
+		allClusters := &clustersv1alpha1.ClusterList{}
+		if err := platformCluster.Client().List(ctx, allClusters); err != nil {
+			return nil, fmt.Errorf("unable to list Cluster resources: %w", err)
+		}
+		relevantClusters = []*clustersv1alpha1.Cluster{}
+
+		for _, cluster := range allClusters.Items {
 			// check for matching injection rules
 			for _, rule := range cfg.Spec.InjectionRules {
 				if rule.Matches(&cluster) {
