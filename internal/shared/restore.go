@@ -17,7 +17,7 @@ import (
 
 	goipam "github.com/metal-stack/go-ipam"
 
-	gardenerv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
+	gardenv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
 	jsonpatchapi "github.com/openmcp-project/controller-utils/api/jsonpatch"
 	"github.com/openmcp-project/controller-utils/pkg/clusters"
 	"github.com/openmcp-project/controller-utils/pkg/logging"
@@ -27,8 +27,8 @@ import (
 )
 
 type RestorationInstruction struct {
-	ClusterConfigsToCreate []*gardenerv1alpha1.ClusterConfig
-	ClusterConfigsToUpdate []*gardenerv1alpha1.ClusterConfig
+	ClusterConfigsToCreate []*gardenv1alpha1.ClusterConfig
+	ClusterConfigsToUpdate []*gardenv1alpha1.ClusterConfig
 }
 
 // Size returns the number of ClusterConfigs to create and update as specified in the instruction.
@@ -66,7 +66,7 @@ func (ri *RestorationInstruction) Apply(ctx context.Context, platformCluster *cl
 // It returns a list of ClusterConfigs that need to be created (first return value) and updated (second return value) in order to restore the expected state.
 // Note that this function does not actually perform the create/update operations, it just prepares the ClusterConfig objects with the necessary changes.
 // Both the appliedRules and the ccs arguments may be nil, in which case they will be fetched by the function. The ccs argument is expected to be a mapping from ruleID to ClusterConfig.
-func CheckClusterConfigsForCluster(ctx context.Context, platformCluster *clusters.Cluster, cl *clustersv1alpha1.Cluster, appliedRules ipamv1alpha1.AppliedRulesAnnotation, ccs map[string]*gardenerv1alpha1.ClusterConfig) (*RestorationInstruction, error) {
+func CheckClusterConfigsForCluster(ctx context.Context, platformCluster *clusters.Cluster, cl *clustersv1alpha1.Cluster, appliedRules ipamv1alpha1.AppliedRulesAnnotation, ccs map[string]*gardenv1alpha1.ClusterConfig) (*RestorationInstruction, error) {
 	log := logging.FromContextOrPanic(ctx)
 
 	// fetch appliedRules if not provided
@@ -133,8 +133,8 @@ func CheckClusterConfigsForCluster(ctx context.Context, platformCluster *cluster
 	}
 
 	// update ClusterConfigs accordingly to the identified missing injections
-	newCCs := map[string]*gardenerv1alpha1.ClusterConfig{}
-	updatedCCs := map[string]*gardenerv1alpha1.ClusterConfig{}
+	newCCs := map[string]*gardenv1alpha1.ClusterConfig{}
+	updatedCCs := map[string]*gardenv1alpha1.ClusterConfig{}
 	var errs error
 	for ruleID, injections := range missingInjections {
 		if len(injections) == 0 {
@@ -222,12 +222,12 @@ func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.
 
 	// verify integrity of each Cluster and restore its state
 	var errs error
-	handledCCs := make([]*gardenerv1alpha1.ClusterConfig, 0, len(ccs))
+	handledCCs := make([]*gardenv1alpha1.ClusterConfig, 0, len(ccs))
 	for _, cluster := range clusters {
 		// to avoid having to fetch the ClusterConfigs again, filter the existing list
 		// since each of these ClusterConfigs belongs only to a single cluster, we can also remove it from the list afterwards
-		newCCs := make([]*gardenerv1alpha1.ClusterConfig, 0, len(ccs))
-		clusterCCs := make(map[string]*gardenerv1alpha1.ClusterConfig)
+		newCCs := make([]*gardenv1alpha1.ClusterConfig, 0, len(ccs))
+		clusterCCs := make(map[string]*gardenv1alpha1.ClusterConfig)
 		for _, cc := range ccs {
 			if cc.Namespace == cluster.Namespace && cc.Labels[ipamv1alpha1.ClusterTargetLabel] == cluster.Name {
 				clusterCCs[cc.Labels[ipamv1alpha1.InjectionRuleLabel]] = cc
@@ -289,7 +289,7 @@ func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.
 }
 
 // ipamFromClusterConfigs evaluates the given ClusterConfigs and returns a new ipam state based on the CIDRs from the ClusterConfigs' patches.
-func ipamFromClusterConfigs(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, ccs []*gardenerv1alpha1.ClusterConfig) (goipam.Ipamer, error) {
+func ipamFromClusterConfigs(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, ccs []*gardenv1alpha1.ClusterConfig) (goipam.Ipamer, error) {
 	ipam := goipam.New(ctx)
 
 	// register parent CIDRs from config
@@ -388,7 +388,7 @@ func fetchOrNewPrefix(ctx context.Context, ipam goipam.Ipamer, cidr string) (*go
 // If the Cluster exists, nothing needs to be done, as the ClusterConfig is not orphaned.
 // Otherwise, it deletes the ClusterConfig, tries to free all CIDRs in the ClusterConfig from the IPAM state and removes the finalizer if successful.
 // It returns a list of ClusterConfigs that still exist after the operation, meaning they were not orphaned, their CIDRs could not be freed, or they had one or more finalizers remaining after having the CIDR management one removed.
-func HandleOrphanedClusterConfigs(ctx context.Context, platformCluster *clusters.Cluster, ccs ...*gardenerv1alpha1.ClusterConfig) ([]*gardenerv1alpha1.ClusterConfig, error) {
+func HandleOrphanedClusterConfigs(ctx context.Context, platformCluster *clusters.Cluster, ccs ...*gardenv1alpha1.ClusterConfig) ([]*gardenv1alpha1.ClusterConfig, error) {
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -397,11 +397,11 @@ func HandleOrphanedClusterConfigs(ctx context.Context, platformCluster *clusters
 
 // handleOrphanedClusterConfigs_internal is the internal version of HandleOrphanedClusterConfigs.
 // It expects the caller to hold the IPAM lock.
-func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster *clusters.Cluster, ccs ...*gardenerv1alpha1.ClusterConfig) ([]*gardenerv1alpha1.ClusterConfig, error) {
+func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster *clusters.Cluster, ccs ...*gardenv1alpha1.ClusterConfig) ([]*gardenv1alpha1.ClusterConfig, error) {
 	log := logging.FromContextOrPanic(ctx)
 	log.Debug("Handling orphaned ClusterConfig resources ...")
 
-	remaining := []*gardenerv1alpha1.ClusterConfig{}
+	remaining := []*gardenv1alpha1.ClusterConfig{}
 
 	var errs error
 	checkedClustersKey := func(namespace, name string) string {

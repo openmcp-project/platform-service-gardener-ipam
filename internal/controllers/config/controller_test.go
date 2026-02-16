@@ -6,7 +6,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -14,28 +13,16 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/clusters"
 	"github.com/openmcp-project/controller-utils/pkg/collections"
 	testutils "github.com/openmcp-project/controller-utils/pkg/testing"
-	clustersv1alpha1 "github.com/openmcp-project/openmcp-operator/api/clusters/v1alpha1"
 
-	"github.com/openmcp-project/platform-service-gardener-ipam/api/install"
 	ipamv1alpha1 "github.com/openmcp-project/platform-service-gardener-ipam/api/ipam/v1alpha1"
 	"github.com/openmcp-project/platform-service-gardener-ipam/internal/controllers/config"
 	"github.com/openmcp-project/platform-service-gardener-ipam/internal/shared"
 )
 
-const (
-	platformCluster = "platform"
-
-	providerName = "gardener-ipam"
-	environment  = "default"
-)
-
-var platformScheme = install.InstallOperatorAPIsPlatform(runtime.NewScheme())
-
 func defaultTestSetup(testDirPathSegments ...string) *testutils.Environment {
 	env := testutils.NewEnvironmentBuilder().
 		WithFakeClient(platformScheme).
 		WithInitObjectPath(testDirPathSegments...).
-		WithDynamicObjectsWithStatus(&clustersv1alpha1.AccessRequest{}).
 		WithReconcilerConstructor(func(c client.Client) reconcile.Reconciler {
 			rec := config.NewIPAMConfigController(clusters.NewTestClusterFromClient(platformCluster, c), providerName, nil)
 			return rec

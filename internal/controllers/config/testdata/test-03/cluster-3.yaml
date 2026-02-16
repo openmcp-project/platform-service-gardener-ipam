@@ -4,8 +4,7 @@ metadata:
   name: cluster-3
   namespace: test
 spec:
-  kubernetes: {}
-  profile: kind
+  profile: garden-small
   purposes:
   - test-0
   tenancy: Shared

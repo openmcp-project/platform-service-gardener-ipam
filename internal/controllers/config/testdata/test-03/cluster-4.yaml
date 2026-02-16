@@ -6,8 +6,7 @@ metadata:
   labels:
     openmcp.cloud/test: "true"
 spec:
-  kubernetes: {}
-  profile: kind
+  profile: garden-small
   purposes:
   - test-1
   - nope

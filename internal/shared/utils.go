@@ -16,7 +16,7 @@ import (
 
 	goipam "github.com/metal-stack/go-ipam"
 
-	gardenerv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
+	gardenv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
 	jsonpatchapi "github.com/openmcp-project/controller-utils/api/jsonpatch"
 	"github.com/openmcp-project/controller-utils/pkg/clusters"
 	"github.com/openmcp-project/controller-utils/pkg/collections"
@@ -108,34 +108,34 @@ func FetchRelevantClusters(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, pl
 }
 
 // FetchClusterConfigs fetches all ClusterConfig resources that are managed by this controller according to their labels.
-func FetchClusterConfigs(ctx context.Context, platformCluster *clusters.Cluster) ([]*gardenerv1alpha1.ClusterConfig, error) {
-	ccs := &gardenerv1alpha1.ClusterConfigList{}
+func FetchClusterConfigs(ctx context.Context, platformCluster *clusters.Cluster) ([]*gardenv1alpha1.ClusterConfig, error) {
+	ccs := &gardenv1alpha1.ClusterConfigList{}
 	if err := platformCluster.Client().List(ctx, ccs, client.MatchingLabels(ClusterConfigLabels(nil, ""))); err != nil {
 		return nil, fmt.Errorf("error listing ClusterConfigs: %w", err)
 	}
-	return collections.ProjectSliceToSlice(ccs.Items, func(cc gardenerv1alpha1.ClusterConfig) *gardenerv1alpha1.ClusterConfig {
+	return collections.ProjectSliceToSlice(ccs.Items, func(cc gardenv1alpha1.ClusterConfig) *gardenv1alpha1.ClusterConfig {
 		return &cc
 	}), nil
 }
 
 // FetchClusterConfigsForCluster fetches all ClusterConfig resources created by the IPAM controller for the given cluster.
 // It returns them as a mapping of ruleID to ClusterConfig, where the ruleID is taken from the InjectionRuleLabel on the ClusterConfig.
-func FetchClusterConfigsForCluster(ctx context.Context, platformCluster *clusters.Cluster, cl *clustersv1alpha1.Cluster) (map[string]*gardenerv1alpha1.ClusterConfig, error) {
-	ccs := &gardenerv1alpha1.ClusterConfigList{}
+func FetchClusterConfigsForCluster(ctx context.Context, platformCluster *clusters.Cluster, cl *clustersv1alpha1.Cluster) (map[string]*gardenv1alpha1.ClusterConfig, error) {
+	ccs := &gardenv1alpha1.ClusterConfigList{}
 	if err := platformCluster.Client().List(ctx, ccs, client.MatchingLabels(ClusterConfigLabels(cl, "")), client.InNamespace(cl.Namespace)); err != nil {
 		return nil, err
 	}
-	return collections.ProjectSliceToMap(ccs.Items, func(cc gardenerv1alpha1.ClusterConfig) (string, *gardenerv1alpha1.ClusterConfig) {
+	return collections.ProjectSliceToMap(ccs.Items, func(cc gardenv1alpha1.ClusterConfig) (string, *gardenv1alpha1.ClusterConfig) {
 		return cc.Labels[ipamv1alpha1.InjectionRuleLabel], &cc
 	}), nil
 }
 
-func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID string, injections map[string]string) (*gardenerv1alpha1.ClusterConfig, error) {
+func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID string, injections map[string]string) (*gardenv1alpha1.ClusterConfig, error) {
 	ccName, err := GenerateClusterConfigName(cl, ruleID)
 	if err != nil {
 		return nil, err
 	}
-	cc := &gardenerv1alpha1.ClusterConfig{
+	cc := &gardenv1alpha1.ClusterConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ccName,
 			Namespace: cl.Namespace,
@@ -156,7 +156,7 @@ func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID 
 		},
 	}
 
-	cc.Spec.PatchOptions = &gardenerv1alpha1.PatchOptions{
+	cc.Spec.PatchOptions = &gardenv1alpha1.PatchOptions{
 		CreateMissingOnAdd: ptr.To(true),
 	}
 	// add patches for all injections
@@ -197,7 +197,7 @@ func GenerateClusterConfigName(cl *clustersv1alpha1.Cluster, ruleID string) (str
 //
 // Note that this function is atomic: If an error occurs, none of the CIDRs from the ClusterConfig are released. Otherwise, all of them are released.
 // This is achieved by modifying a copy of the internal IPAM state and only swapping it with the real internal state if everything has worked.
-func ReleaseCIDRsForClusterConfig(ctx context.Context, cc *gardenerv1alpha1.ClusterConfig) error {
+func ReleaseCIDRsForClusterConfig(ctx context.Context, cc *gardenv1alpha1.ClusterConfig) error {
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -206,7 +206,7 @@ func ReleaseCIDRsForClusterConfig(ctx context.Context, cc *gardenerv1alpha1.Clus
 
 // releaseCIDRsForClusterConfig_internal is the internal version of ReleaseCIDRsForClusterConfig.
 // It assumes that the caller holds the ipam lock.
-func releaseCIDRsForClusterConfig_internal(ctx context.Context, cc *gardenerv1alpha1.ClusterConfig) error {
+func releaseCIDRsForClusterConfig_internal(ctx context.Context, cc *gardenv1alpha1.ClusterConfig) error {
 	log := logging.FromContextOrPanic(ctx)
 
 	// create a copy of the internal IPAM instance to make this operation atomic

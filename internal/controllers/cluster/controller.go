@@ -22,7 +22,7 @@ import (
 
 	goipam "github.com/metal-stack/go-ipam"
 
-	gardenerv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
+	gardenv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
 	"github.com/openmcp-project/controller-utils/pkg/clusters"
 	"github.com/openmcp-project/controller-utils/pkg/collections"
 	ctrlutils "github.com/openmcp-project/controller-utils/pkg/controller"
@@ -69,7 +69,7 @@ func NewIPAMClusterController(platformCluster *clusters.Cluster, er events.Event
 
 type ReconcileResult struct {
 	Cluster       *clustersv1alpha1.Cluster
-	ClusterConfig *gardenerv1alpha1.ClusterConfig
+	ClusterConfig *gardenv1alpha1.ClusterConfig
 	EventAction   string
 	Result        reconcile.Result
 	Error         error
@@ -238,7 +238,7 @@ func (c *IPAMClusterController) handleDelete(ctx context.Context, req reconcile.
 
 	// This method is executed after the Cluster resource has been deleted.
 	// We need to identify all ClusterConfigs that belonged to this Cluster, free the corresponding CIDRs and remove the finalizers from the ClusterConfigs.
-	ccs := &gardenerv1alpha1.ClusterConfigList{}
+	ccs := &gardenv1alpha1.ClusterConfigList{}
 	if err := c.PlatformCluster.Client().List(ctx, ccs, client.MatchingLabels(shared.ClusterConfigLabels(&clustersv1alpha1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: req.Name, Namespace: req.Namespace}}, "")), client.InNamespace(req.Namespace)); err != nil {
 		return fmt.Errorf("unable to list ClusterConfig resources: %w", err)
 	}
@@ -279,7 +279,7 @@ type InjectionManagementResult struct {
 // None of the passed-in objects is modified, nor does any interaction with the platform cluster happen here.
 // RulesWithIssues will contain one entry for each rule in applicableRules that would inject a CIDR in a path where another rule has already injected a CIDR into. Only rules which would result in new ClusterConfigs are considered here, conflicting updates for existing ClusterConfigs are simply ignored.
 // This function may still return a non-nil InjectionManagementResult, even if an error occurred. In this case, the returned result should be applied, because the internal CIDR management state has changed according to it.
-func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *clustersv1alpha1.Cluster, cfg *ipamv1alpha1.IPAMConfig, applicableRules []ipamv1alpha1.CIDRInjection, ccs map[string]*gardenerv1alpha1.ClusterConfig) (*InjectionManagementResult, string, error) {
+func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *clustersv1alpha1.Cluster, cfg *ipamv1alpha1.IPAMConfig, applicableRules []ipamv1alpha1.CIDRInjection, ccs map[string]*gardenv1alpha1.ClusterConfig) (*InjectionManagementResult, string, error) {
 	log := logging.FromContextOrPanic(ctx)
 	allErrs := []error{}
 
@@ -509,7 +509,7 @@ func (c *IPAMClusterController) SetupWithManager(mgr ctrl.Manager) error {
 			),
 		))).
 		// watch owned ClusterConfig resources with the fitting labels
-		Owns(&gardenerv1alpha1.ClusterConfig{}, builder.WithPredicates(predicate.And(
+		Owns(&gardenv1alpha1.ClusterConfig{}, builder.WithPredicates(predicate.And(
 			ctrlutils.HasLabelPredicate(openmcpconst.ManagedByLabel, shared.ProviderName()),
 			ctrlutils.HasLabelPredicate(openmcpconst.ManagedPurposeLabel, ipamv1alpha1.ManagedPurposeLabelValue),
 			ctrlutils.HasLabelPredicate(openmcpconst.EnvironmentLabel, shared.Environment()),
