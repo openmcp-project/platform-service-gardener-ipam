@@ -1,0 +1,46 @@
+apiVersion: gardener.clusters.openmcp.cloud/v1alpha1
+kind: IPAMConfig
+metadata:
+  name: ipam
+spec:
+  parentCIDRs:
+    foo:
+    - 10.0.0.0/16
+  injectionRules:
+  - id: rule1
+    injections:
+    - id: nodes
+      path: spec.networking.nodes
+      parents:
+      - foo
+      subnetSize: 24
+    - id: podsA
+      path: spec.networking.podsA
+      parents:
+      - nodes
+      subnetSize: 28
+    - id: podsB
+      path: spec.networking.podsB
+      parents:
+      - nodes
+      subnetSize: 28
+    - id: subA
+      path: spec.networking.subA
+      parents:
+      - podsA
+      subnetSize: 30
+    - id: subB
+      path: spec.networking.subB
+      parents:
+      - podsB
+      subnetSize: 30
+    matchPurposes:
+    - operator: ContainsAny
+      values:
+      - test-0
+      - test-1
+    - operator: ContainsNone
+      values:
+      - nope
+    matchLabels:
+      openmcp.cloud/test: "true"

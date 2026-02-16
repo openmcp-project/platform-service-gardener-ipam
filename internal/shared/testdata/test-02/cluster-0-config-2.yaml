@@ -1,0 +1,18 @@
+apiVersion: gardener.clusters.openmcp.cloud/v1alpha1
+kind: ClusterConfig
+metadata:
+  name: cluster-0--ipam--rule3
+  namespace: test
+  labels:
+    openmcp.cloud/managed-by: ipam
+    openmcp.cloud/managed-purpose: gardener-ipam
+    openmcp.cloud/environment: test
+    ipam.gardener.clusters.openmcp.cloud/cluster: cluster-0
+    ipam.gardener.clusters.openmcp.cloud/injection-rule: rule3
+spec:
+  patchOptions:
+    createMissingOnAdd: true
+  patches:
+  - op: add
+    path: /spec/networking/whatever
+    value: 12.0.1.0/24

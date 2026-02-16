@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	goipam "github.com/metal-stack/go-ipam"
 
@@ -130,6 +131,7 @@ func FetchClusterConfigsForCluster(ctx context.Context, platformCluster *cluster
 	}), nil
 }
 
+// GenerateClusterConfigForInjectionList generates a ClusterConfig resource for the given cluster, injection rule ID and list of injections (mapping from JSONPath to CIDR).
 func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID string, injections map[string]string) (*gardenv1alpha1.ClusterConfig, error) {
 	ccName, err := GenerateClusterConfigName(cl, ruleID)
 	if err != nil {
@@ -151,7 +153,7 @@ func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID 
 				},
 			},
 			Finalizers: []string{
-				ipamv1alpha1.CIDRReleaseFinalizer,
+				ipamv1alpha1.CIDRManagementFinalizer,
 			},
 		},
 	}
@@ -177,6 +179,8 @@ func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID 
 	return cc, nil
 }
 
+// GenerateClusterConfigName is used to generate the name for a ClusterConfig resource based on the cluster and the ruleID.
+// The name is generated as "<cluster-name>--ipam--<ruleID>", but shortened if it exceeds the Kubernetes name length limit.
 func GenerateClusterConfigName(cl *clustersv1alpha1.Cluster, ruleID string) (string, error) {
 	if cl == nil || ruleID == "" {
 		return "", fmt.Errorf("cluster and ruleID must not be nil or empty")
@@ -192,21 +196,20 @@ func GenerateClusterConfigName(cl *clustersv1alpha1.Cluster, ruleID string) (str
 // This is meant to be used on ClusterConfigs that are in deletion, but still have the CIDR management finalizer.
 // No-op if the ClusterConfig does not have the CIDR management finalizer, as then the CIDRs could already have been released and taken by another ClusterConfig
 // and releasing them again could cause conflicts.
-// If the function returns an error, the finalizer must not be removed.
-// If the function does not return an error, all CIDRs are freed and the finalizer must be removed.
+// After releasing the CIDRs, the CIDR management finalizer is removed from the ClusterConfigs. Failing to do so causes an error and prevents the CIDRs from being released.
 //
 // Note that this function is atomic: If an error occurs, none of the CIDRs from the ClusterConfig are released. Otherwise, all of them are released.
 // This is achieved by modifying a copy of the internal IPAM state and only swapping it with the real internal state if everything has worked.
-func ReleaseCIDRsForClusterConfig(ctx context.Context, cc *gardenv1alpha1.ClusterConfig) error {
-	lock.Lock()
-	defer lock.Unlock()
+func ReleaseCIDRsForClusterConfig(ctx context.Context, platformCluster *clusters.Cluster, cc *gardenv1alpha1.ClusterConfig) error {
+	IPAM.lock.Lock()
+	defer IPAM.lock.Unlock()
 
-	return releaseCIDRsForClusterConfig_internal(ctx, cc)
+	return releaseCIDRsForClusterConfig_internal(ctx, platformCluster, cc)
 }
 
 // releaseCIDRsForClusterConfig_internal is the internal version of ReleaseCIDRsForClusterConfig.
 // It assumes that the caller holds the ipam lock.
-func releaseCIDRsForClusterConfig_internal(ctx context.Context, cc *gardenv1alpha1.ClusterConfig) error {
+func releaseCIDRsForClusterConfig_internal(ctx context.Context, platformCluster *clusters.Cluster, cc *gardenv1alpha1.ClusterConfig) error {
 	log := logging.FromContextOrPanic(ctx)
 
 	// create a copy of the internal IPAM instance to make this operation atomic
@@ -236,6 +239,13 @@ func releaseCIDRsForClusterConfig_internal(ctx context.Context, cc *gardenv1alph
 			if err := newIpam.ReleaseChildPrefix(ctx, ptr); err != nil && !errors.Is(err, goipam.ErrNotFound) {
 				return fmt.Errorf("unable to release child prefix %s: %w", ptr.Cidr, err)
 			}
+		}
+	}
+	// remove the CIDR management finalizer
+	old := cc.DeepCopy()
+	if controllerutil.RemoveFinalizer(cc, ipamv1alpha1.CIDRManagementFinalizer) {
+		if err := platformCluster.Client().Patch(ctx, cc, client.MergeFrom(old)); err != nil {
+			return fmt.Errorf("error removing CIDR management finalizer from ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err)
 		}
 	}
 

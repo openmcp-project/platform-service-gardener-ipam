@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	goipam "github.com/metal-stack/go-ipam"
 
@@ -66,6 +67,7 @@ func (ri *RestorationInstruction) Apply(ctx context.Context, platformCluster *cl
 // It returns a list of ClusterConfigs that need to be created (first return value) and updated (second return value) in order to restore the expected state.
 // Note that this function does not actually perform the create/update operations, it just prepares the ClusterConfig objects with the necessary changes.
 // Both the appliedRules and the ccs arguments may be nil, in which case they will be fetched by the function. The ccs argument is expected to be a mapping from ruleID to ClusterConfig.
+// ClusterConfigs which are missing the CIDR management finalizer will be added to the update list, unless they are in deletion.
 func CheckClusterConfigsForCluster(ctx context.Context, platformCluster *clusters.Cluster, cl *clustersv1alpha1.Cluster, appliedRules ipamv1alpha1.AppliedRulesAnnotation, ccs map[string]*gardenv1alpha1.ClusterConfig) (*RestorationInstruction, error) {
 	log := logging.FromContextOrPanic(ctx)
 
@@ -73,7 +75,7 @@ func CheckClusterConfigsForCluster(ctx context.Context, platformCluster *cluster
 	if appliedRules == nil {
 		log.Debug("Parsing applied rules annotation")
 		appliedRulesString, ok := cl.Annotations[ipamv1alpha1.AppliedRulesAnnotationKey]
-		appliedRules := ipamv1alpha1.AppliedRulesAnnotation{}
+		appliedRules = ipamv1alpha1.AppliedRulesAnnotation{}
 		if ok {
 			if err := appliedRules.FromAnnotation(appliedRulesString); err != nil {
 				return nil, fmt.Errorf("unable to recover applied rules: %w", err)
@@ -105,9 +107,7 @@ func CheckClusterConfigsForCluster(ctx context.Context, platformCluster *cluster
 			if mi == nil {
 				mi = map[string]string{}
 			}
-			for path, cidr := range injections {
-				mi[path] = cidr
-			}
+			maps.Copy(mi, injections)
 			missingInjections[ruleID] = mi
 			continue
 		}
@@ -169,10 +169,24 @@ func CheckClusterConfigsForCluster(ctx context.Context, platformCluster *cluster
 			updatedCCs[ruleID] = cc
 		}
 	}
-
 	if errs != nil {
 		return nil, fmt.Errorf("one or more errors occurred trying to generate ClusterConfigs for missing injections:\n%w", errs)
 	}
+
+	// check if any ClusterConfig is missing the CIDR management finalizer
+	for ruleID, cc := range ccs {
+		if !slices.Contains(cc.GetFinalizers(), ipamv1alpha1.CIDRManagementFinalizer) && cc.GetDeletionTimestamp().IsZero() {
+			// finalizer is missing and the ClusterConfig is not in deletion, add it to the update list
+			newCC, ok := updatedCCs[ruleID]
+			if !ok {
+				newCC = cc.DeepCopy()
+			}
+			if controllerutil.AddFinalizer(newCC, ipamv1alpha1.CIDRManagementFinalizer) {
+				updatedCCs[ruleID] = newCC
+			}
+		}
+	}
+
 	return &RestorationInstruction{
 		ClusterConfigsToCreate: slices.Collect(maps.Values(newCCs)),
 		ClusterConfigsToUpdate: slices.Collect(maps.Values(updatedCCs)),
@@ -189,9 +203,15 @@ func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.
 
 	log.Info("Restoring IPAM state from cluster state")
 
+	// initialize IPAM if not already initialized
+	// Technically, this should also be wrapped in a lock, but conflicts are unlikely here.
+	if IPAM == nil {
+		IPAM = NewIpam()
+	}
+
 	// get lock
-	lock.Lock()
-	defer lock.Unlock()
+	IPAM.lock.Lock()
+	defer IPAM.lock.Unlock()
 
 	// get config
 	var cfg *ipamv1alpha1.IPAMConfig
@@ -222,7 +242,7 @@ func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.
 
 	// verify integrity of each Cluster and restore its state
 	var errs error
-	handledCCs := make([]*gardenv1alpha1.ClusterConfig, 0, len(ccs))
+	handledCCs := map[string]*gardenv1alpha1.ClusterConfig{}
 	for _, cluster := range clusters {
 		// to avoid having to fetch the ClusterConfigs again, filter the existing list
 		// since each of these ClusterConfigs belongs only to a single cluster, we can also remove it from the list afterwards
@@ -231,7 +251,7 @@ func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.
 		for _, cc := range ccs {
 			if cc.Namespace == cluster.Namespace && cc.Labels[ipamv1alpha1.ClusterTargetLabel] == cluster.Name {
 				clusterCCs[cc.Labels[ipamv1alpha1.InjectionRuleLabel]] = cc
-				handledCCs = append(handledCCs, cc)
+				handledCCs[objectKey(cc)] = cc
 			} else {
 				newCCs = append(newCCs, cc)
 			}
@@ -244,10 +264,19 @@ func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.
 			continue
 		}
 		if createCount, updateCount := ir.Size(); createCount > 0 || updateCount > 0 {
-			log.Info("Restoring ClusterConfigs for Cluster '%s/%s' (%d to create, %d to update)", cluster.Namespace, cluster.Name, createCount, updateCount)
+			log.Info("Restoring ClusterConfigs", "cluster", fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name), "createCount", createCount, "updateCount", updateCount)
 			if err := ir.Apply(ctx, platformCluster); err != nil {
 				errs = errors.Join(errs, fmt.Errorf("error restoring ClusterConfigs for Cluster '%s/%s': %w", cluster.Namespace, cluster.Name, err))
 				continue
+			}
+			// the cluster state changed, let's fetch the ClusterConfigs for the Cluster again to make sure we have the latest state for the next steps
+			updatedCCs, err := FetchClusterConfigsForCluster(ctx, platformCluster, cluster)
+			if err != nil {
+				errs = errors.Join(errs, fmt.Errorf("error fetching ClusterConfigs for Cluster '%s/%s' after update: %w", cluster.Namespace, cluster.Name, err))
+				continue
+			}
+			for _, cc := range updatedCCs {
+				handledCCs[objectKey(cc)] = cc
 			}
 		}
 	}
@@ -257,11 +286,11 @@ func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.
 
 	// handle orphaned ClusterConfigs
 	// All ClusterConfigs that are still part of the 'ccs' list have not been handled, which can happen due to one of two reasons:
-	// - The selecter in the config has changed and the corresponding Cluster was selected before but is not any more. In this case, the method for handling orphaned ClusterConfigs will detect the existing Cluster and do nothing.
+	// - The selector in the config has changed and the corresponding Cluster was selected before but is not any more. In this case, the method for handling orphaned ClusterConfigs will detect the existing Cluster and do nothing.
 	// - The corresponding Cluster has been deleted, but for some reason, the ClusterConfig still exists. In this case, the method for handling orphaned ClusterConfigs should clean up the ClusterConfig and free the CIDRs in the IPAM state.
 	if len(ccs) > 0 {
 		log.Info("Some ClusterConfigs could not be assigned to a Cluster and are potentially orphaned, triggering cleanup", "count", len(ccs))
-		remainingCCs, err := HandleOrphanedClusterConfigs(ctx, platformCluster, ccs...)
+		remainingCCs, err := handleOrphanedClusterConfigs_internal(ctx, platformCluster, ccs...)
 		if err != nil {
 			return fmt.Errorf("error handling orphaned ClusterConfigs: %w", err)
 		}
@@ -269,14 +298,14 @@ func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.
 
 		// if there are remaining ClusterConfigs with the CIDR management finalizer left, we must consider their CIDRs as still allocated and add them to the IPAM state
 		for _, cc := range remainingCCs {
-			if slices.Contains(cc.GetFinalizers(), ipamv1alpha1.CIDRReleaseFinalizer) {
-				handledCCs = append(handledCCs, cc)
+			if slices.Contains(cc.GetFinalizers(), ipamv1alpha1.CIDRManagementFinalizer) {
+				handledCCs[objectKey(cc)] = cc
 			}
 		}
 	}
 
 	log.Debug("Building IPAM state from ClusterConfigs")
-	ipam, err := ipamFromClusterConfigs(ctx, cfg, handledCCs)
+	ipam, err := ipamFromClusterConfigs(ctx, cfg, slices.Collect(maps.Values(handledCCs)))
 	if err != nil {
 		return fmt.Errorf("error building IPAM state from ClusterConfigs: %w", err)
 	}
@@ -322,16 +351,23 @@ func ipamFromClusterConfigs(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, c
 			if err != nil {
 				return nil, fmt.Errorf("error identifying parent CIDR for '%s' (patch index %d): %w", cidr, idx, err)
 			}
+			var child *goipam.Prefix
 			if parent == nil {
 				// the CIDR does not have a registered parent
 				// This can happen if a parent CIDR got removed from the config after it has already been used for generating child CIDRs.
 				// In this case, we register the CIDR in the ipam state, but don't add it to the parent list, as it should not have any children outside of the following patches (which will be handled by the tmpParents list).
-				parent, err = fetchOrNewPrefix(ctx, ipam, cidr)
+				_, err = fetchOrNewPrefix(ctx, ipam, cidr)
 				if err != nil {
 					return nil, fmt.Errorf("error registering parentless prefix '%s' (patch index %d): %w", cidr, idx, err)
 				}
+			} else {
+				// the CIDR has a registered parent, so let's register it as a child of the parent
+				child, err = ipam.AcquireSpecificChildPrefix(ctx, parent.Cidr, cidr)
+				if err != nil {
+					return nil, fmt.Errorf("error registering child prefix '%s' under parent '%s' (patch index %d): %w", cidr, parent.Cidr, idx, err)
+				}
+				tmpParents = append(tmpParents, child)
 			}
-			tmpParents = append(tmpParents, parent)
 		}
 	}
 
@@ -389,8 +425,8 @@ func fetchOrNewPrefix(ctx context.Context, ipam goipam.Ipamer, cidr string) (*go
 // Otherwise, it deletes the ClusterConfig, tries to free all CIDRs in the ClusterConfig from the IPAM state and removes the finalizer if successful.
 // It returns a list of ClusterConfigs that still exist after the operation, meaning they were not orphaned, their CIDRs could not be freed, or they had one or more finalizers remaining after having the CIDR management one removed.
 func HandleOrphanedClusterConfigs(ctx context.Context, platformCluster *clusters.Cluster, ccs ...*gardenv1alpha1.ClusterConfig) ([]*gardenv1alpha1.ClusterConfig, error) {
-	lock.Lock()
-	defer lock.Unlock()
+	IPAM.lock.Lock()
+	defer IPAM.lock.Unlock()
 
 	return handleOrphanedClusterConfigs_internal(ctx, platformCluster, ccs...)
 }
@@ -404,9 +440,6 @@ func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster 
 	remaining := []*gardenv1alpha1.ClusterConfig{}
 
 	var errs error
-	checkedClustersKey := func(namespace, name string) string {
-		return fmt.Sprintf("%s/%s", namespace, name)
-	}
 	checkedClusters := map[string]*clustersv1alpha1.Cluster{} // cache to avoid fetching the same cluster multiple times, key is "namespace/name"
 	for _, cc := range ccs {
 		clog := log.WithValues("clusterConfig", fmt.Sprintf("%s/%s", cc.Namespace, cc.Name))
@@ -417,7 +450,7 @@ func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster 
 			continue
 		}
 		var cluster *clustersv1alpha1.Cluster
-		if c, ok := checkedClusters[checkedClustersKey(cc.Namespace, cName)]; ok {
+		if c, ok := checkedClusters[objectKeyFromStrings(cc.Namespace, cName)]; ok {
 			cluster = c
 		} else {
 			cluster = &clustersv1alpha1.Cluster{}
@@ -448,13 +481,13 @@ func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster 
 		}
 
 		// if the ClusterConfig still has the IPAM finalizer, try to release the CIDRs and remove the finalizer
-		if slices.Contains(cc.GetFinalizers(), ipamv1alpha1.CIDRReleaseFinalizer) {
+		if slices.Contains(cc.GetFinalizers(), ipamv1alpha1.CIDRManagementFinalizer) {
 			clog.Debug("CIDR management finalizer is still present on ClusterConfig, trying to release CIDRs ...")
-		}
-		if err := releaseCIDRsForClusterConfig_internal(ctx, cc); err != nil {
-			errs = errors.Join(errs, fmt.Errorf("error releasing CIDRs for orphaned ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
-			remaining = append(remaining, cc)
-			continue
+			if err := releaseCIDRsForClusterConfig_internal(ctx, platformCluster, cc); err != nil {
+				errs = errors.Join(errs, fmt.Errorf("error releasing CIDRs for orphaned ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
+				remaining = append(remaining, cc)
+				continue
+			}
 		}
 
 		// check if other finalizers are present, otherwise the ClusterConfig can be considered fully deleted
@@ -469,4 +502,12 @@ func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster 
 		return remaining, fmt.Errorf("one or more errors occurred during handling of orphaned ClusterConfigs:\n%w", errs)
 	}
 	return remaining, nil
+}
+
+func objectKeyFromStrings(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
+}
+
+func objectKey(obj client.Object) string {
+	return objectKeyFromStrings(obj.GetNamespace(), obj.GetName())
 }

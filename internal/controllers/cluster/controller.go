@@ -14,7 +14,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -246,15 +245,8 @@ func (c *IPAMClusterController) handleDelete(ctx context.Context, req reconcile.
 
 	var errs error
 	for _, cc := range ccs.Items {
-		if err := shared.ReleaseCIDRsForClusterConfig(ctx, &cc); err != nil {
+		if err := shared.ReleaseCIDRsForClusterConfig(ctx, c.PlatformCluster, &cc); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("error trying to release CIDRs from ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
-		} else {
-			log.Debug("Successfully released CIDRs for ClusterConfig, removing finalizer", "ClusterConfig", fmt.Sprintf("%s/%s", cc.Namespace, cc.Name))
-			old := cc.DeepCopy()
-			controllerutil.RemoveFinalizer(&cc, ipamv1alpha1.CIDRReleaseFinalizer)
-			if err := c.PlatformCluster.Client().Patch(ctx, &cc, client.MergeFrom(old)); err != nil {
-				errs = errors.Join(errs, fmt.Errorf("unable to remove finalizer from ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
-			}
 		}
 	}
 
