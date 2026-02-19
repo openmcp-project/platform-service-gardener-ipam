@@ -32,7 +32,7 @@ tasks:
         apiVersion: openmcp.cloud/v1alpha1
         kind: PlatformService
         metadata:
-          name: dns
+          name: gardener-ipam
         spec:
           image: ghcr.io/openmcp-project/images/platform-service-gardener-ipam:{{.VERSION}}
           verbosity: {{.VERBOSITY}}

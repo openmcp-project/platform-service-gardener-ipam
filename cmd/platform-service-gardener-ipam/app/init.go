@@ -11,8 +11,8 @@ import (
 	clustersv1alpha1 "github.com/openmcp-project/openmcp-operator/api/clusters/v1alpha1"
 	openmcpconst "github.com/openmcp-project/openmcp-operator/api/constants"
 
-	"github.com/openmcp-project/platform-service-dns/api/crds"
-	providerscheme "github.com/openmcp-project/platform-service-dns/api/install"
+	"github.com/openmcp-project/platform-service-gardener-ipam/api/crds"
+	providerscheme "github.com/openmcp-project/platform-service-gardener-ipam/api/install"
 )
 
 func NewInitCommand(so *SharedOptions) *cobra.Command {

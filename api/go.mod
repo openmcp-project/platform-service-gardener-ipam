@@ -1,18 +1,19 @@
 module github.com/openmcp-project/platform-service-gardener-ipam/api
 
-go 1.25.6
+go 1.25.7
 
 require (
 	github.com/fluxcd/helm-controller/api v1.4.5
 	github.com/fluxcd/source-controller/api v1.7.4
+	github.com/openmcp-project/cluster-provider-gardener/api v0.10.0
 	github.com/openmcp-project/controller-utils v0.25.2
-	github.com/openmcp-project/platform-service-dns/api v0.0.5
 )
 
 require (
 	github.com/fluxcd/pkg/apis/acl v0.9.0 // indirect
 	github.com/fluxcd/pkg/apis/kustomize v1.14.0 // indirect
 	github.com/fluxcd/pkg/apis/meta v1.23.0 // indirect
+	github.com/openmcp-project/controller-utils/api v0.25.2 // indirect
 )
 
 require (
@@ -38,7 +39,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/openmcp-project/openmcp-operator/api v0.18.1
+	github.com/openmcp-project/openmcp-operator/api v0.18.2-0.20260210151615-bf963d18570a
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect

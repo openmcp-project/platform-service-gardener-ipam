@@ -24,6 +24,9 @@ import (
 
 	providerscheme "github.com/openmcp-project/platform-service-gardener-ipam/api/install"
 	ipamv1alpha1 "github.com/openmcp-project/platform-service-gardener-ipam/api/ipam/v1alpha1"
+	"github.com/openmcp-project/platform-service-gardener-ipam/internal/controllers/cluster"
+	"github.com/openmcp-project/platform-service-gardener-ipam/internal/controllers/config"
+	"github.com/openmcp-project/platform-service-gardener-ipam/internal/shared"
 )
 
 var setupLog logging.Logger
@@ -34,7 +37,7 @@ func NewRunCommand(so *SharedOptions) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Run the Platform Service DNS",
+		Short: "Run the Platform Service Gardener-IPAM",
 		Run: func(cmd *cobra.Command, args []string) {
 			opts.PrintRawOptions(cmd)
 			if err := opts.Complete(cmd.Context()); err != nil {
@@ -236,7 +239,7 @@ func (o *RunOptions) Run(ctx context.Context) error {
 	// setup Cluster reconciler
 	// verify GardenerIPAMConfig existence
 	// This also happens in the reconcile, but then the pod will look healthy while it is actually not able to reconcile anything.
-	svcCfg := &ipamv1alpha1.GardenerIPAMConfig{}
+	svcCfg := &ipamv1alpha1.IPAMConfig{}
 	svcCfg.Name = o.ProviderName
 	if err := o.PlatformCluster.Client().Get(ctx, client.ObjectKeyFromObject(svcCfg), svcCfg); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -244,9 +247,24 @@ func (o *RunOptions) Run(ctx context.Context) error {
 		}
 		return fmt.Errorf("error getting GardenerIPAMConfig '%s': %w", svcCfg.Name, err)
 	}
-	// if err := cluster.NewClusterReconciler(o.PlatformCluster, mgr.GetEventRecorder(cluster.ControllerName), o.ProviderName, o.ProviderNamespace, o.Environment).SetupWithManager(mgr); err != nil {
-	// 	return fmt.Errorf("unable to add Cluster reconciler to manager: %w", err)
-	// }
+	shared.SetConfig(svcCfg)
+
+	// restore the internal IPAM state from the cluster
+	if err := shared.RestoreIPAMFromClusterState(ctx, o.PlatformCluster); err != nil {
+		return fmt.Errorf("error restoring IPAM state from cluster: %w", err)
+	}
+
+	// setup config controller
+	cfgCtrl := config.NewIPAMConfigController(o.PlatformCluster, o.ProviderName, mgr.GetEventRecorder(config.ControllerName))
+	if err := cfgCtrl.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to add IPAMConfig reconciler to manager: %w", err)
+	}
+
+	// setup cluster controller
+	clusterCtrl := cluster.NewIPAMClusterController(o.PlatformCluster, mgr.GetEventRecorder(cluster.ControllerName))
+	if err := clusterCtrl.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to add Cluster reconciler to manager: %w", err)
+	}
 
 	if o.MetricsCertWatcher != nil {
 		setupLog.Info("Adding metrics certificate watcher to manager")
