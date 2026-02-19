@@ -1,0 +1,10 @@
+apiVersion: clusters.openmcp.cloud/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-1
+  namespace: test
+spec:
+  profile: garden-small
+  purposes:
+  - multi
+  tenancy: Shared

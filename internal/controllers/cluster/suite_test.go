@@ -1,4 +1,4 @@
-package config_test
+package cluster_test
 
 import (
 	"testing"
@@ -15,17 +15,17 @@ import (
 const (
 	platformCluster = "platform"
 
-	providerName = "gardener-ipam"
-	environment  = "default"
+	providerName = "ipam"
+	environment  = "test"
 )
 
 var platformScheme = install.InstallOperatorAPIsPlatform(runtime.NewScheme())
 
-func TestConfigController(t *testing.T) {
+func TestClusterController(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	shared.SetProviderName(providerName)
 	shared.SetEnvironment(environment)
 
-	RunSpecs(t, "IPAM Config Controller Test Suite")
+	RunSpecs(t, "IPAM Cluster Controller Test Suite")
 }

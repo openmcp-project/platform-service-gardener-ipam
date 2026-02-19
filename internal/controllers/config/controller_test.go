@@ -40,12 +40,7 @@ func cidrSliceToStringSlice(cidrs []ipamv1alpha1.CIDR) []string {
 	return result
 }
 
-var _ = Describe("Config Controller", Serial, Ordered, func() {
-
-	BeforeAll(func() {
-		shared.SetProviderName(providerName)
-		shared.SetEnvironment(environment)
-	})
+var _ = Describe("Config Controller", Serial, func() {
 
 	BeforeEach(func() {
 		shared.SetConfig(nil)
