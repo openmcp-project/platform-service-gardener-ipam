@@ -37,7 +37,7 @@ func NewRunCommand(so *SharedOptions) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Run the Platform Servic Gardener-IPAM",
+		Short: "Run the Platform Service Gardener-IPAM",
 		Run: func(cmd *cobra.Command, args []string) {
 			opts.PrintRawOptions(cmd)
 			if err := opts.Complete(cmd.Context()); err != nil {
