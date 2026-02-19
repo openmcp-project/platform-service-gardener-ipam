@@ -193,10 +193,6 @@ github.com/openmcp-project/controller-utils/api v0.25.2 h1:YToD4plpAuUYLb4wYS0CU
 github.com/openmcp-project/controller-utils/api v0.25.2/go.mod h1:1m9nYieXg7z/qbOTPDMK3mnvCpFs3h5NB1S3652Bsq4=
 github.com/openmcp-project/openmcp-operator/api v0.18.2-0.20260210151615-bf963d18570a h1:JYgl4eiIl6pNHsJPYER0Ob6FANAjpUR2SDKWSK4nGaw=
 github.com/openmcp-project/openmcp-operator/api v0.18.2-0.20260210151615-bf963d18570a/go.mod h1:4gGO3luVDXtyId4fBkgvxTpoxpB2/CsCaPVZpMOG1oI=
-github.com/openmcp-project/platform-service-dns/api v0.0.5 h1:6MN4WwV6//IRUl0O/5W3Cz5yj940WE6Uf5SksgbF2Kg=
-github.com/openmcp-project/platform-service-dns/api v0.0.5/go.mod h1:3lFhGA58v8fSxqEoxtn3scrF7Lur9lLLuyxJmdRnnzE=
-github.com/openmcp-project/platform-service-gardener-ipam/api v0.0.0-20260210152900-ffd012055841 h1:W+x9qApBygzuP3/2ur834nFmEDcpMOll6MiFPWGSBV8=
-github.com/openmcp-project/platform-service-gardener-ipam/api v0.0.0-20260210152900-ffd012055841/go.mod h1:vdhJNdKn/BRutiJbsZvkVZKX5X0R+s8ooi6BHynhtGQ=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
