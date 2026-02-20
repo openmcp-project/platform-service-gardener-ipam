@@ -1,0 +1,11 @@
+apiVersion: clusters.openmcp.cloud/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-nomatch
+  namespace: test
+spec:
+  profile: garden-small
+  purposes:
+  - test-0
+  - nope
+  tenancy: Shared

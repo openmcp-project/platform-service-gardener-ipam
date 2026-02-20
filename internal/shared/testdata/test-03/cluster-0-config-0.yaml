@@ -1,0 +1,32 @@
+apiVersion: gardener.clusters.openmcp.cloud/v1alpha1
+kind: ClusterConfig
+metadata:
+  name: cluster-0--ipam--rule1
+  namespace: test
+  finalizers:
+  - ipam.gardener.clusters.openmcp.cloud/cidr-management
+  labels:
+    openmcp.cloud/managed-by: ipam
+    openmcp.cloud/managed-purpose: gardener-ipam
+    openmcp.cloud/environment: test
+    ipam.gardener.clusters.openmcp.cloud/cluster: cluster-0
+    ipam.gardener.clusters.openmcp.cloud/injection-rule: rule1
+spec:
+  patchOptions:
+    createMissingOnAdd: true
+  patches:
+  - op: add
+    path: /spec/networking/nodes
+    value: 10.0.0.0/24
+  - op: add
+    path: /spec/networking/podsA
+    value: 10.0.0.0/28
+  - op: add
+    path: /spec/networking/podsB
+    value: 10.0.0.16/28
+  - op: add
+    path: /spec/networking/subA
+    value: 10.0.0.0/30
+  - op: add
+    path: /spec/networking/subB
+    value: 10.0.0.16/30

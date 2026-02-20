@@ -13,12 +13,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	goipam "github.com/metal-stack/go-ipam"
 
-	gardenerv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
+	gardenv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
 	jsonpatchapi "github.com/openmcp-project/controller-utils/api/jsonpatch"
-	"github.com/openmcp-project/controller-utils/pkg/clusters"
 	"github.com/openmcp-project/controller-utils/pkg/collections"
 	ctrlutils "github.com/openmcp-project/controller-utils/pkg/controller"
 	"github.com/openmcp-project/controller-utils/pkg/logging"
@@ -48,52 +48,52 @@ func ClusterConfigLabels(cl *clustersv1alpha1.Cluster, ruleID string) map[string
 // FetchRelevantClusters fetches all Cluster resources from the platform cluster and filters them depending on the config:
 // - If the config is nil, it returns all clusters which for which at least one ClusterConfig managed by this controller exists.
 // - If the config is not nil, it returns all clusters which match at least one of the injection rules defined in the config.
-func FetchRelevantClusters(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, platformCluster *clusters.Cluster) ([]*clustersv1alpha1.Cluster, error) {
+func FetchRelevantClusters(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, platformCluster client.Client) ([]*clustersv1alpha1.Cluster, error) {
 	log := logging.FromContextOrPanic(ctx)
 
-	allClusters := &clustersv1alpha1.ClusterList{}
-	if err := platformCluster.Client().List(ctx, allClusters); err != nil {
-		return nil, fmt.Errorf("unable to list Cluster resources: %w", err)
-	}
-
 	var relevantClusters []*clustersv1alpha1.Cluster
-	for _, cluster := range allClusters.Items {
-		if cfg == nil {
-			// no config, fetch ClusterConfigs and return their owners
-			ccs, err := FetchClusterConfigs(ctx, platformCluster)
-			if err != nil {
-				return nil, fmt.Errorf("error fetching ClusterConfigs: %w", err)
+	if cfg == nil {
+		// no config, fetch ClusterConfigs and return their owners
+		ccs, err := FetchClusterConfigs(ctx, platformCluster)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching ClusterConfigs: %w", err)
+		}
+		tmp := map[string]map[string]*clustersv1alpha1.Cluster{} // cluster namespace -> cluster name -> cluster, temporary cache to avoid fetching the same cluster multiple times
+		var errs error
+		for _, cc := range ccs {
+			cName, ok := cc.Labels[ipamv1alpha1.ClusterTargetLabel]
+			if !ok {
+				log.Error(nil, "ClusterConfig is missing the cluster target label", "clusterConfig", fmt.Sprintf("%s/%s", cc.Namespace, cc.Name), "label", ipamv1alpha1.ClusterTargetLabel)
+				continue
 			}
-			tmp := map[string]map[string]*clustersv1alpha1.Cluster{} // cluster namespace -> cluster name -> cluster, temporary cache to avoid fetching the same cluster multiple times
-			var errs error
-			for _, cc := range ccs {
-				cName, ok := cc.Labels[ipamv1alpha1.ClusterTargetLabel]
-				if !ok {
-					log.Error(nil, "ClusterConfig is missing the cluster target label", "clusterConfig", fmt.Sprintf("%s/%s", cc.Namespace, cc.Name), "label", ipamv1alpha1.ClusterTargetLabel)
-					continue
-				}
-				ns, ok := tmp[cc.Namespace]
-				if !ok {
-					ns = map[string]*clustersv1alpha1.Cluster{}
-					tmp[cc.Namespace] = ns
-				}
-				if _, ok := ns[cName]; !ok { // nothing to do if the cluster is already fetched
-					c := &clustersv1alpha1.Cluster{}
-					if err := platformCluster.Client().Get(ctx, client.ObjectKey{Namespace: cc.Namespace, Name: cName}, c); err != nil {
-						if !apierrors.IsNotFound(err) {
-							errs = errors.Join(errs, fmt.Errorf("error fetching Cluster '%s' for ClusterConfig '%s/%s': %w", cName, cc.Namespace, cc.Name, err))
-						}
-					} else {
-						ns[cName] = c
+			ns, ok := tmp[cc.Namespace]
+			if !ok {
+				ns = map[string]*clustersv1alpha1.Cluster{}
+				tmp[cc.Namespace] = ns
+			}
+			if _, ok := ns[cName]; !ok { // nothing to do if the cluster is already fetched
+				c := &clustersv1alpha1.Cluster{}
+				if err := platformCluster.Get(ctx, client.ObjectKey{Namespace: cc.Namespace, Name: cName}, c); err != nil {
+					if !apierrors.IsNotFound(err) {
+						errs = errors.Join(errs, fmt.Errorf("error fetching Cluster '%s' for ClusterConfig '%s/%s': %w", cName, cc.Namespace, cc.Name, err))
 					}
+				} else {
+					ns[cName] = c
 				}
 			}
-			relevantClusters = collections.AggregateMap(tmp, func(_ string, clustersInNamespace map[string]*clustersv1alpha1.Cluster, res []*clustersv1alpha1.Cluster) []*clustersv1alpha1.Cluster {
-				res = append(res, slices.Collect(maps.Values(clustersInNamespace))...)
-				return res
-			}, []*clustersv1alpha1.Cluster{})
-		} else {
-			relevantClusters = []*clustersv1alpha1.Cluster{}
+		}
+		relevantClusters = collections.AggregateMap(tmp, func(_ string, clustersInNamespace map[string]*clustersv1alpha1.Cluster, res []*clustersv1alpha1.Cluster) []*clustersv1alpha1.Cluster {
+			res = append(res, slices.Collect(maps.Values(clustersInNamespace))...)
+			return res
+		}, []*clustersv1alpha1.Cluster{})
+	} else {
+		allClusters := &clustersv1alpha1.ClusterList{}
+		if err := platformCluster.List(ctx, allClusters); err != nil {
+			return nil, fmt.Errorf("unable to list Cluster resources: %w", err)
+		}
+		relevantClusters = []*clustersv1alpha1.Cluster{}
+
+		for _, cluster := range allClusters.Items {
 			// check for matching injection rules
 			for _, rule := range cfg.Spec.InjectionRules {
 				if rule.Matches(&cluster) {
@@ -108,34 +108,35 @@ func FetchRelevantClusters(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, pl
 }
 
 // FetchClusterConfigs fetches all ClusterConfig resources that are managed by this controller according to their labels.
-func FetchClusterConfigs(ctx context.Context, platformCluster *clusters.Cluster) ([]*gardenerv1alpha1.ClusterConfig, error) {
-	ccs := &gardenerv1alpha1.ClusterConfigList{}
-	if err := platformCluster.Client().List(ctx, ccs, client.MatchingLabels(ClusterConfigLabels(nil, ""))); err != nil {
+func FetchClusterConfigs(ctx context.Context, platformCluster client.Client) ([]*gardenv1alpha1.ClusterConfig, error) {
+	ccs := &gardenv1alpha1.ClusterConfigList{}
+	if err := platformCluster.List(ctx, ccs, client.MatchingLabels(ClusterConfigLabels(nil, ""))); err != nil {
 		return nil, fmt.Errorf("error listing ClusterConfigs: %w", err)
 	}
-	return collections.ProjectSliceToSlice(ccs.Items, func(cc gardenerv1alpha1.ClusterConfig) *gardenerv1alpha1.ClusterConfig {
+	return collections.ProjectSliceToSlice(ccs.Items, func(cc gardenv1alpha1.ClusterConfig) *gardenv1alpha1.ClusterConfig {
 		return &cc
 	}), nil
 }
 
 // FetchClusterConfigsForCluster fetches all ClusterConfig resources created by the IPAM controller for the given cluster.
 // It returns them as a mapping of ruleID to ClusterConfig, where the ruleID is taken from the InjectionRuleLabel on the ClusterConfig.
-func FetchClusterConfigsForCluster(ctx context.Context, platformCluster *clusters.Cluster, cl *clustersv1alpha1.Cluster) (map[string]*gardenerv1alpha1.ClusterConfig, error) {
-	ccs := &gardenerv1alpha1.ClusterConfigList{}
-	if err := platformCluster.Client().List(ctx, ccs, client.MatchingLabels(ClusterConfigLabels(cl, "")), client.InNamespace(cl.Namespace)); err != nil {
+func FetchClusterConfigsForCluster(ctx context.Context, platformCluster client.Client, cl *clustersv1alpha1.Cluster) (map[string]*gardenv1alpha1.ClusterConfig, error) {
+	ccs := &gardenv1alpha1.ClusterConfigList{}
+	if err := platformCluster.List(ctx, ccs, client.MatchingLabels(ClusterConfigLabels(cl, "")), client.InNamespace(cl.Namespace)); err != nil {
 		return nil, err
 	}
-	return collections.ProjectSliceToMap(ccs.Items, func(cc gardenerv1alpha1.ClusterConfig) (string, *gardenerv1alpha1.ClusterConfig) {
+	return collections.ProjectSliceToMap(ccs.Items, func(cc gardenv1alpha1.ClusterConfig) (string, *gardenv1alpha1.ClusterConfig) {
 		return cc.Labels[ipamv1alpha1.InjectionRuleLabel], &cc
 	}), nil
 }
 
-func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID string, injections map[string]string) (*gardenerv1alpha1.ClusterConfig, error) {
+// GenerateClusterConfigForInjectionList generates a ClusterConfig resource for the given cluster, injection rule ID and list of injections (mapping from JSONPath to CIDR).
+func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID string, injections map[string]string) (*gardenv1alpha1.ClusterConfig, error) {
 	ccName, err := GenerateClusterConfigName(cl, ruleID)
 	if err != nil {
 		return nil, err
 	}
-	cc := &gardenerv1alpha1.ClusterConfig{
+	cc := &gardenv1alpha1.ClusterConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ccName,
 			Namespace: cl.Namespace,
@@ -151,12 +152,12 @@ func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID 
 				},
 			},
 			Finalizers: []string{
-				ipamv1alpha1.CIDRReleaseFinalizer,
+				ipamv1alpha1.CIDRManagementFinalizer,
 			},
 		},
 	}
 
-	cc.Spec.PatchOptions = &gardenerv1alpha1.PatchOptions{
+	cc.Spec.PatchOptions = &gardenv1alpha1.PatchOptions{
 		CreateMissingOnAdd: ptr.To(true),
 	}
 	// add patches for all injections
@@ -177,6 +178,8 @@ func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID 
 	return cc, nil
 }
 
+// GenerateClusterConfigName is used to generate the name for a ClusterConfig resource based on the cluster and the ruleID.
+// The name is generated as "<cluster-name>--ipam--<ruleID>", but shortened if it exceeds the Kubernetes name length limit.
 func GenerateClusterConfigName(cl *clustersv1alpha1.Cluster, ruleID string) (string, error) {
 	if cl == nil || ruleID == "" {
 		return "", fmt.Errorf("cluster and ruleID must not be nil or empty")
@@ -192,21 +195,20 @@ func GenerateClusterConfigName(cl *clustersv1alpha1.Cluster, ruleID string) (str
 // This is meant to be used on ClusterConfigs that are in deletion, but still have the CIDR management finalizer.
 // No-op if the ClusterConfig does not have the CIDR management finalizer, as then the CIDRs could already have been released and taken by another ClusterConfig
 // and releasing them again could cause conflicts.
-// If the function returns an error, the finalizer must not be removed.
-// If the function does not return an error, all CIDRs are freed and the finalizer must be removed.
+// After releasing the CIDRs, the CIDR management finalizer is removed from the ClusterConfigs. Failing to do so causes an error and prevents the CIDRs from being released.
 //
 // Note that this function is atomic: If an error occurs, none of the CIDRs from the ClusterConfig are released. Otherwise, all of them are released.
 // This is achieved by modifying a copy of the internal IPAM state and only swapping it with the real internal state if everything has worked.
-func ReleaseCIDRsForClusterConfig(ctx context.Context, cc *gardenerv1alpha1.ClusterConfig) error {
-	lock.Lock()
-	defer lock.Unlock()
+func ReleaseCIDRsForClusterConfig(ctx context.Context, platformCluster client.Client, cc *gardenv1alpha1.ClusterConfig) error {
+	IPAM.lock.Lock()
+	defer IPAM.lock.Unlock()
 
-	return releaseCIDRsForClusterConfig_internal(ctx, cc)
+	return releaseCIDRsForClusterConfig_internal(ctx, platformCluster, cc)
 }
 
 // releaseCIDRsForClusterConfig_internal is the internal version of ReleaseCIDRsForClusterConfig.
 // It assumes that the caller holds the ipam lock.
-func releaseCIDRsForClusterConfig_internal(ctx context.Context, cc *gardenerv1alpha1.ClusterConfig) error {
+func releaseCIDRsForClusterConfig_internal(ctx context.Context, platformCluster client.Client, cc *gardenv1alpha1.ClusterConfig) error {
 	log := logging.FromContextOrPanic(ctx)
 
 	// create a copy of the internal IPAM instance to make this operation atomic
@@ -236,6 +238,13 @@ func releaseCIDRsForClusterConfig_internal(ctx context.Context, cc *gardenerv1al
 			if err := newIpam.ReleaseChildPrefix(ctx, ptr); err != nil && !errors.Is(err, goipam.ErrNotFound) {
 				return fmt.Errorf("unable to release child prefix %s: %w", ptr.Cidr, err)
 			}
+		}
+	}
+	// remove the CIDR management finalizer
+	old := cc.DeepCopy()
+	if controllerutil.RemoveFinalizer(cc, ipamv1alpha1.CIDRManagementFinalizer) {
+		if err := platformCluster.Patch(ctx, cc, client.MergeFrom(old)); err != nil {
+			return fmt.Errorf("error removing CIDR management finalizer from ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err)
 		}
 	}
 
