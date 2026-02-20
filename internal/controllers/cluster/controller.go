@@ -173,7 +173,7 @@ func (c *IPAMClusterController) handleCreateOrUpdate(ctx context.Context, rr Rec
 	cfg := shared.GetConfig()
 
 	// fetch all ClusterConfigs managed by this controller for this Cluster
-	ccs, err := shared.FetchClusterConfigsForCluster(ctx, c.PlatformCluster, rr.Cluster)
+	ccs, err := shared.FetchClusterConfigsForCluster(ctx, c.PlatformCluster.Client(), rr.Cluster)
 	if err != nil {
 		return ReconcileResult{Cluster: rr.Cluster, EventAction: EventActionEvaluatingExistingClusterConfigs, Error: fmt.Errorf("error fetching ClusterConfigs for Cluster: %w", err)}
 	}
@@ -214,7 +214,7 @@ func (c *IPAMClusterController) handleCreateOrUpdate(ctx context.Context, rr Rec
 		// create/update ClusterConfigs
 		countCreate, countUpdate := ir.Size()
 		log.Debug("Creating/Updating ClusterConfigs", "countCreate", countCreate, "countUpdate", countUpdate)
-		if err := ir.Apply(ctx, c.PlatformCluster); err != nil {
+		if err := ir.Apply(ctx, c.PlatformCluster.Client()); err != nil {
 			errs = errors.Join(errs, err)
 		}
 	}
@@ -245,7 +245,7 @@ func (c *IPAMClusterController) handleDelete(ctx context.Context, req reconcile.
 
 	// This method is executed after the Cluster resource has been deleted.
 	// We need to identify all ClusterConfigs that belonged to this Cluster, free the corresponding CIDRs and remove the finalizers from the ClusterConfigs.
-	ccs, err := shared.FetchClusterConfigsForCluster(ctx, c.PlatformCluster, &clustersv1alpha1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: req.Name, Namespace: req.Namespace}})
+	ccs, err := shared.FetchClusterConfigsForCluster(ctx, c.PlatformCluster.Client(), &clustersv1alpha1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: req.Name, Namespace: req.Namespace}})
 	if err != nil {
 		return fmt.Errorf("error fetching ClusterConfigs for deleted Cluster: %w", err)
 	}
@@ -253,7 +253,7 @@ func (c *IPAMClusterController) handleDelete(ctx context.Context, req reconcile.
 
 	var errs error
 	for _, cc := range ccs {
-		if err := shared.ReleaseCIDRsForClusterConfig(ctx, c.PlatformCluster, cc); err != nil {
+		if err := shared.ReleaseCIDRsForClusterConfig(ctx, c.PlatformCluster.Client(), cc); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("error trying to release CIDRs from ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
 		}
 	}
@@ -332,7 +332,7 @@ func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *cluste
 	}
 
 	var err error
-	res.RestorationInstruction, err = shared.CheckClusterConfigsForCluster(ctx, c.PlatformCluster, cl, appliedRules, ccs)
+	res.RestorationInstruction, err = shared.CheckClusterConfigsForCluster(ctx, c.PlatformCluster.Client(), cl, appliedRules, ccs)
 	if err != nil {
 		return nil, EventActionEvaluatingMissingInjections, fmt.Errorf("errors occurred while evaluating missing injections:\n%w", err)
 	}

@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openmcp-project/controller-utils/pkg/clusters"
 	testutils "github.com/openmcp-project/controller-utils/pkg/testing"
 
 	"github.com/openmcp-project/platform-service-gardener-ipam/api/install"
@@ -18,8 +17,6 @@ import (
 )
 
 const (
-	platformCluster = "platform"
-
 	providerName = "ipam"
 	environment  = "test"
 )
@@ -35,7 +32,7 @@ func TestSharedFunctions(t *testing.T) {
 	RunSpecs(t, "IPAM Shared Functions Test Suite")
 }
 
-func defaultTestSetup(testDirPathSegments ...string) (*testutils.Environment, *clusters.Cluster, *ipamv1alpha1.IPAMConfig) {
+func defaultTestSetup(testDirPathSegments ...string) (*testutils.Environment, *ipamv1alpha1.IPAMConfig) {
 	env := testutils.NewEnvironmentBuilder().
 		WithFakeClient(platformScheme).
 		WithInitObjectPath(testDirPathSegments...).
@@ -45,5 +42,5 @@ func defaultTestSetup(testDirPathSegments ...string) (*testutils.Environment, *c
 	Expect(env.Client().Get(env.Ctx, client.ObjectKey{Name: providerName}, cfg)).To(Succeed())
 	shared.SetConfig(cfg)
 
-	return env, clusters.NewTestClusterFromClient(platformCluster, env.Client()), cfg
+	return env, cfg
 }

@@ -250,7 +250,7 @@ func (o *RunOptions) Run(ctx context.Context) error {
 	shared.SetConfig(svcCfg)
 
 	// restore the internal IPAM state from the cluster
-	if err := shared.RestoreIPAMFromClusterState(ctx, o.PlatformCluster); err != nil {
+	if err := shared.RestoreIPAMFromClusterState(ctx, o.PlatformCluster.Client()); err != nil {
 		return fmt.Errorf("error restoring IPAM state from cluster: %w", err)
 	}
 

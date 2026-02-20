@@ -20,7 +20,6 @@ import (
 
 	gardenv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
 	jsonpatchapi "github.com/openmcp-project/controller-utils/api/jsonpatch"
-	"github.com/openmcp-project/controller-utils/pkg/clusters"
 	"github.com/openmcp-project/controller-utils/pkg/logging"
 	clustersv1alpha1 "github.com/openmcp-project/openmcp-operator/api/clusters/v1alpha1"
 
@@ -42,18 +41,18 @@ func (ri *RestorationInstruction) Size() (int, int) {
 }
 
 // Apply acts on the instructions and creates/updates the ClusterConfigs as specified.
-func (ri *RestorationInstruction) Apply(ctx context.Context, platformCluster *clusters.Cluster) error {
+func (ri *RestorationInstruction) Apply(ctx context.Context, platformCluster client.Client) error {
 	if ri == nil {
 		return nil
 	}
 	var errs error
 	for _, cc := range ri.ClusterConfigsToCreate {
-		if err := platformCluster.Client().Create(ctx, cc); err != nil {
+		if err := platformCluster.Create(ctx, cc); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("error creating ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
 		}
 	}
 	for _, cc := range ri.ClusterConfigsToUpdate {
-		if err := platformCluster.Client().Update(ctx, cc); err != nil {
+		if err := platformCluster.Update(ctx, cc); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("error updating ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
 		}
 	}
@@ -68,7 +67,7 @@ func (ri *RestorationInstruction) Apply(ctx context.Context, platformCluster *cl
 // Note that this function does not actually perform the create/update operations, it just prepares the ClusterConfig objects with the necessary changes.
 // Both the appliedRules and the ccs arguments may be nil, in which case they will be fetched by the function. The ccs argument is expected to be a mapping from ruleID to ClusterConfig.
 // ClusterConfigs which are missing the CIDR management finalizer will be added to the update list, unless they are in deletion.
-func CheckClusterConfigsForCluster(ctx context.Context, platformCluster *clusters.Cluster, cl *clustersv1alpha1.Cluster, appliedRules ipamv1alpha1.AppliedRulesAnnotation, ccs map[string]*gardenv1alpha1.ClusterConfig) (*RestorationInstruction, error) {
+func CheckClusterConfigsForCluster(ctx context.Context, platformCluster client.Client, cl *clustersv1alpha1.Cluster, appliedRules ipamv1alpha1.AppliedRulesAnnotation, ccs map[string]*gardenv1alpha1.ClusterConfig) (*RestorationInstruction, error) {
 	log := logging.FromContextOrPanic(ctx)
 
 	// fetch appliedRules if not provided
@@ -197,7 +196,7 @@ func CheckClusterConfigsForCluster(ctx context.Context, platformCluster *cluster
 // It fetches all relevant Clusters and ClusterConfigs from the platform cluster, restores missing ClusterConfigs based on the appliedRules annotation on the cluster resources,
 // and overwrites the shared IPAM state based on the existing ClusterConfigs.
 // To avoid any inconsistencies, this function holds the ipam lock for the entire duration, meaning no other operations that need the IPAM state can run in parallel.
-func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.Cluster) error {
+func RestoreIPAMFromClusterState(ctx context.Context, platformCluster client.Client) error {
 	log := logging.FromContextOrPanic(ctx).WithName("Restore")
 	ctx = logging.NewContext(ctx, log)
 
@@ -219,7 +218,7 @@ func RestoreIPAMFromClusterState(ctx context.Context, platformCluster *clusters.
 		// this can happen if this method is called during startup, before the config controller had the chance to fetch the config
 		cfg = &ipamv1alpha1.IPAMConfig{}
 		log.Debug("Config not yet loaded, loading config")
-		if err := platformCluster.Client().Get(ctx, types.NamespacedName{Name: ProviderName()}, cfg); err != nil {
+		if err := platformCluster.Get(ctx, types.NamespacedName{Name: ProviderName()}, cfg); err != nil {
 			return fmt.Errorf("error loading config: %w", err)
 		}
 	} else {
@@ -424,7 +423,7 @@ func fetchOrNewPrefix(ctx context.Context, ipam goipam.Ipamer, cidr string) (*go
 // If the Cluster exists, nothing needs to be done, as the ClusterConfig is not orphaned.
 // Otherwise, it deletes the ClusterConfig, tries to free all CIDRs in the ClusterConfig from the IPAM state and removes the finalizer if successful.
 // It returns a list of ClusterConfigs that still exist after the operation, meaning they were not orphaned, their CIDRs could not be freed, or they had one or more finalizers remaining after having the CIDR management one removed.
-func HandleOrphanedClusterConfigs(ctx context.Context, platformCluster *clusters.Cluster, ccs ...*gardenv1alpha1.ClusterConfig) ([]*gardenv1alpha1.ClusterConfig, error) {
+func HandleOrphanedClusterConfigs(ctx context.Context, platformCluster client.Client, ccs ...*gardenv1alpha1.ClusterConfig) ([]*gardenv1alpha1.ClusterConfig, error) {
 	IPAM.lock.Lock()
 	defer IPAM.lock.Unlock()
 
@@ -433,7 +432,7 @@ func HandleOrphanedClusterConfigs(ctx context.Context, platformCluster *clusters
 
 // handleOrphanedClusterConfigs_internal is the internal version of HandleOrphanedClusterConfigs.
 // It expects the caller to hold the IPAM lock.
-func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster *clusters.Cluster, ccs ...*gardenv1alpha1.ClusterConfig) ([]*gardenv1alpha1.ClusterConfig, error) {
+func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster client.Client, ccs ...*gardenv1alpha1.ClusterConfig) ([]*gardenv1alpha1.ClusterConfig, error) {
 	log := logging.FromContextOrPanic(ctx)
 	log.Debug("Handling orphaned ClusterConfig resources ...")
 
@@ -454,7 +453,7 @@ func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster 
 			cluster = c
 		} else {
 			cluster = &clustersv1alpha1.Cluster{}
-			if err := platformCluster.Client().Get(ctx, types.NamespacedName{Namespace: cc.Namespace, Name: cName}, cluster); err != nil {
+			if err := platformCluster.Get(ctx, types.NamespacedName{Namespace: cc.Namespace, Name: cName}, cluster); err != nil {
 				if !apierrors.IsNotFound(err) {
 					errs = errors.Join(errs, fmt.Errorf("error checking existence of Cluster '%s/%s' for ClusterConfig '%s/%s': %w", cc.Namespace, cName, cc.Namespace, cc.Name, err))
 				}
@@ -471,7 +470,7 @@ func handleOrphanedClusterConfigs_internal(ctx context.Context, platformCluster 
 
 		// trigger deletion, if not already triggered
 		if cc.GetDeletionTimestamp().IsZero() {
-			if err := platformCluster.Client().Delete(ctx, cc); client.IgnoreNotFound(err) != nil {
+			if err := platformCluster.Delete(ctx, cc); client.IgnoreNotFound(err) != nil {
 				errs = errors.Join(errs, fmt.Errorf("error deleting orphaned ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
 				remaining = append(remaining, cc)
 				continue

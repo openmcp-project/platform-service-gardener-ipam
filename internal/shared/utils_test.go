@@ -26,8 +26,8 @@ var _ = Describe("Shared Utils Functions", Serial, func() {
 		Context("Non-nil config", func() {
 
 			It("should fetch the relevant clusters", func() {
-				env, pc, cfg := defaultTestSetup("testdata", "test-01")
-				clusters, err := shared.FetchRelevantClusters(env.Ctx, cfg, pc)
+				env, cfg := defaultTestSetup("testdata", "test-01")
+				clusters, err := shared.FetchRelevantClusters(env.Ctx, cfg, env.Client())
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(clusters).To(WithTransform(func(clusters []*clustersv1alpha1.Cluster) []string {
@@ -42,8 +42,8 @@ var _ = Describe("Shared Utils Functions", Serial, func() {
 		Context("Nil config", func() {
 
 			It("should fetch the relevant clusters", func() {
-				env, pc, _ := defaultTestSetup("testdata", "test-01")
-				clusters, err := shared.FetchRelevantClusters(env.Ctx, nil, pc)
+				env, _ := defaultTestSetup("testdata", "test-01")
+				clusters, err := shared.FetchRelevantClusters(env.Ctx, nil, env.Client())
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(clusters).To(WithTransform(func(clusters []*clustersv1alpha1.Cluster) []string {
@@ -60,7 +60,7 @@ var _ = Describe("Shared Utils Functions", Serial, func() {
 	Context("GenerateClusterConfigForInjectionList", func() {
 
 		It("should generate the expected ClusterConfig resource", func() {
-			env, _, _ := defaultTestSetup("testdata", "test-01")
+			env, _ := defaultTestSetup("testdata", "test-01")
 			cl := &clustersv1alpha1.Cluster{}
 			Expect(env.Client().Get(env.Ctx, client.ObjectKey{Namespace: "test", Name: "cluster-3"}, cl)).To(Succeed())
 			injections := map[string]string{
@@ -123,8 +123,8 @@ var _ = Describe("Shared Utils Functions", Serial, func() {
 	Context("ReleaseCIDRsForClusterConfig", func() {
 
 		It("should release the CIDRs for the given ClusterConfig", func() {
-			env, pc, _ := defaultTestSetup("testdata", "test-01")
-			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, pc)).To(Succeed())
+			env, _ := defaultTestSetup("testdata", "test-01")
+			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, env.Client())).To(Succeed())
 
 			cidrsInUse, err := shared.IPAM.ReadAllPrefixCidrs(env.Ctx)
 			Expect(err).ToNot(HaveOccurred())
@@ -135,7 +135,7 @@ var _ = Describe("Shared Utils Functions", Serial, func() {
 			Expect(env.Client().Get(env.Ctx, client.ObjectKey{Namespace: "test", Name: "cluster-0--ipam--rule1"}, cc)).To(Succeed())
 			Expect(cc.Finalizers).To(ContainElement(ipamv1alpha1.CIDRManagementFinalizer))
 
-			Expect(shared.ReleaseCIDRsForClusterConfig(env.Ctx, pc, cc)).To(Succeed())
+			Expect(shared.ReleaseCIDRsForClusterConfig(env.Ctx, env.Client(), cc)).To(Succeed())
 
 			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(cc), cc)).To(Succeed())
 			Expect(cc.Finalizers).ToNot(ContainElement(ipamv1alpha1.CIDRManagementFinalizer))

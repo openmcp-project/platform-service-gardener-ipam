@@ -29,7 +29,7 @@ import (
 	"github.com/openmcp-project/platform-service-gardener-ipam/internal/shared"
 )
 
-func defaultTestSetup(testDirPathSegments ...string) (*testutils.Environment, *clusters.Cluster) {
+func defaultTestSetup(testDirPathSegments ...string) *testutils.Environment {
 	env := testutils.NewEnvironmentBuilder().
 		WithFakeClient(platformScheme).
 		WithInitObjectPath(testDirPathSegments...).
@@ -51,7 +51,7 @@ func defaultTestSetup(testDirPathSegments ...string) (*testutils.Environment, *c
 		}
 	}
 
-	return env, clusters.NewTestClusterFromClient(platformCluster, env.Client())
+	return env
 }
 
 var _ = Describe("Cluster Controller", Serial, func() {
@@ -63,7 +63,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 	})
 
 	It("should not create a ClusterConfig if the cluster does not match any rule's selector", func() {
-		env, pc := defaultTestSetup("testdata", "test-01")
+		env := defaultTestSetup("testdata", "test-01")
 
 		req := testutils.RequestFromStrings("cluster-nomatch", "test")
 		env.ShouldReconcile(req)
@@ -71,15 +71,15 @@ var _ = Describe("Cluster Controller", Serial, func() {
 		c := &clustersv1alpha1.Cluster{}
 		Expect(env.Client().Get(env.Ctx, client.ObjectKey{Name: "cluster-nomatch", Namespace: "test"}, c)).To(Succeed())
 
-		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, pc, c)
+		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ccs).To(BeEmpty())
 
-		verifyAppliedRulesAnnotationConsistency(env, pc, c, ccs)
+		verifyAppliedRulesAnnotationConsistency(env, c, ccs)
 	})
 
 	It("should assign disjunct CIDRs to clusters", func() {
-		env, pc := defaultTestSetup("testdata", "test-01")
+		env := defaultTestSetup("testdata", "test-01")
 
 		cidrs := []string{}
 		for _, cName := range []string{"cluster-0", "cluster-1"} {
@@ -87,7 +87,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 			env.ShouldReconcile(req)
 			c := &clustersv1alpha1.Cluster{}
 			Expect(env.Client().Get(env.Ctx, client.ObjectKey{Name: cName, Namespace: "test"}, c)).To(Succeed())
-			ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, pc, c)
+			ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ccs).To(HaveLen(1))
 			for _, cc := range ccs {
@@ -117,7 +117,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 					cidrs = append(cidrs, cidrString)
 				}
 			}
-			verifyAppliedRulesAnnotationConsistency(env, pc, c, ccs)
+			verifyAppliedRulesAnnotationConsistency(env, c, ccs)
 		}
 
 		parent := "10.0.0.0/16"
@@ -131,7 +131,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 	})
 
 	It("should correctly assign nested CIDRs where configured", func() {
-		env, pc := defaultTestSetup("testdata", "test-01")
+		env := defaultTestSetup("testdata", "test-01")
 
 		req := testutils.RequestFromStrings("cluster-2", "test")
 		env.ShouldReconcile(req)
@@ -139,10 +139,10 @@ var _ = Describe("Cluster Controller", Serial, func() {
 		c := &clustersv1alpha1.Cluster{}
 		Expect(env.Client().Get(env.Ctx, client.ObjectKey{Name: "cluster-2", Namespace: "test"}, c)).To(Succeed())
 
-		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, pc, c)
+		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ccs).To(HaveLen(1))
-		verifyAppliedRulesAnnotationConsistency(env, pc, c, ccs)
+		verifyAppliedRulesAnnotationConsistency(env, c, ccs)
 		cc := ccs["nested"]
 		Expect(cc).ToNot(BeNil())
 		parent := "10.0.0.0/16"
@@ -187,7 +187,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 	})
 
 	It("should correctly consider all globally defined parent CIDRs when a rule does not specify any parents", func() {
-		env, pc := defaultTestSetup("testdata", "test-01")
+		env := defaultTestSetup("testdata", "test-01")
 
 		req := testutils.RequestFromStrings("cluster-3", "test")
 		env.ShouldReconcile(req)
@@ -195,10 +195,10 @@ var _ = Describe("Cluster Controller", Serial, func() {
 		c := &clustersv1alpha1.Cluster{}
 		Expect(env.Client().Get(env.Ctx, client.ObjectKey{Name: "cluster-3", Namespace: "test"}, c)).To(Succeed())
 
-		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, pc, c)
+		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ccs).To(HaveLen(1))
-		verifyAppliedRulesAnnotationConsistency(env, pc, c, ccs)
+		verifyAppliedRulesAnnotationConsistency(env, c, ccs)
 		cc := ccs["noparent"]
 		Expect(cc).ToNot(BeNil())
 		Expect(cc.Spec.Patches).To(HaveLen(1))
@@ -209,7 +209,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 	})
 
 	It("should use a subsequent CIDR from the same parent if the previous ones are exhausted", func() {
-		env, pc := defaultTestSetup("testdata", "test-02")
+		env := defaultTestSetup("testdata", "test-02")
 
 		clusters := []*clustersv1alpha1.Cluster{}
 		for i := 0; i <= 4; i++ {
@@ -223,10 +223,10 @@ var _ = Describe("Cluster Controller", Serial, func() {
 
 		ccs := make([][]*gardenv1alpha1.ClusterConfig, len(clusters))
 		for i, c := range clusters {
-			ccList, err := shared.FetchClusterConfigsForCluster(env.Ctx, pc, c)
+			ccList, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
 			Expect(err).ToNot(HaveOccurred())
 			ccs[i] = slices.Collect(maps.Values(ccList))
-			verifyAppliedRulesAnnotationConsistency(env, pc, c, ccList)
+			verifyAppliedRulesAnnotationConsistency(env, c, ccList)
 		}
 
 		// all clusters should have received a CIDR
@@ -243,7 +243,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 	})
 
 	It("should use a subsequent parent CIDR set specified in the rule if the previous ones are exhausted", func() {
-		env, pc := defaultTestSetup("testdata", "test-02")
+		env := defaultTestSetup("testdata", "test-02")
 
 		clusters := []*clustersv1alpha1.Cluster{}
 		for i := 0; i <= 4; i++ {
@@ -260,10 +260,10 @@ var _ = Describe("Cluster Controller", Serial, func() {
 
 		ccs := make([][]*gardenv1alpha1.ClusterConfig, len(clusters))
 		for i, c := range clusters {
-			ccList, err := shared.FetchClusterConfigsForCluster(env.Ctx, pc, c)
+			ccList, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
 			Expect(err).ToNot(HaveOccurred())
 			ccs[i] = slices.Collect(maps.Values(ccList))
-			verifyAppliedRulesAnnotationConsistency(env, pc, c, ccList)
+			verifyAppliedRulesAnnotationConsistency(env, c, ccList)
 		}
 
 		// all clusters should have received a CIDR
@@ -280,7 +280,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 	})
 
 	It("should return an error if no more CIDRs are available to assign", func() {
-		env, _ := defaultTestSetup("testdata", "test-03")
+		env := defaultTestSetup("testdata", "test-03")
 
 		for i := range 2 {
 			cName := fmt.Sprintf("cluster-%d", i)
@@ -294,7 +294,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 	})
 
 	It("should free the assigned CIDRs when a cluster gets deleted", func() {
-		env, pc := defaultTestSetup("testdata", "test-03")
+		env := defaultTestSetup("testdata", "test-03")
 
 		for i := range 2 {
 			cName := fmt.Sprintf("cluster-%d", i)
@@ -308,7 +308,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 		c.SetName("cluster-0")
 		c.SetNamespace("test")
 		Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(c), c)).To(Succeed())
-		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, pc, c)
+		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ccs).To(HaveLen(1))
 		cc := ccs["rule-small"]
@@ -341,7 +341,7 @@ var _ = Describe("Cluster Controller", Serial, func() {
 		req := testutils.RequestFromStrings("cluster-2", "test")
 		env.ShouldReconcile(req)
 		Expect(env.Client().Get(env.Ctx, client.ObjectKey{Name: "cluster-2", Namespace: "test"}, c)).To(Succeed())
-		ccs, err = shared.FetchClusterConfigsForCluster(env.Ctx, pc, c)
+		ccs, err = shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ccs).To(HaveLen(1))
 		cc = ccs["rule-small"]
@@ -351,14 +351,14 @@ var _ = Describe("Cluster Controller", Serial, func() {
 	})
 
 	It("should not free any CIDRs if the Cluster still has finalizers", func() {
-		env, pc := defaultTestSetup("testdata", "test-03")
+		env := defaultTestSetup("testdata", "test-03")
 
 		c := &clustersv1alpha1.Cluster{}
 		c.SetName("cluster-0")
 		c.SetNamespace("test")
 		env.ShouldReconcile(testutils.RequestFromObject(c))
 		Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(c), c)).To(Succeed())
-		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, pc, c)
+		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ccs).To(HaveLen(1))
 		cc := ccs["rule-small"]
@@ -399,11 +399,11 @@ func excludeIndex[T any](slice []T, index int) []T {
 
 // verifyAppliedRulesAnnotationConsistency verifies that the applied rules annotation on the Cluster is consistent with the currently existing ClusterConfigs for the Cluster.
 // If ccs is nil, it will be fetched.
-func verifyAppliedRulesAnnotationConsistency(env *testutils.Environment, pc *clusters.Cluster, cluster *clustersv1alpha1.Cluster, ccs map[string]*gardenv1alpha1.ClusterConfig) {
+func verifyAppliedRulesAnnotationConsistency(env *testutils.Environment, cluster *clustersv1alpha1.Cluster, ccs map[string]*gardenv1alpha1.ClusterConfig) {
 	// fetch ClusterConfigs if not provided
 	if ccs == nil {
 		var err error
-		ccs, err = shared.FetchClusterConfigsForCluster(env.Ctx, pc, cluster)
+		ccs, err = shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), cluster)
 		Expect(err).ToNot(HaveOccurred())
 	}
 

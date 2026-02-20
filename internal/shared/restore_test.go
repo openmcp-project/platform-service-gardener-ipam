@@ -26,7 +26,7 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 	Context("CheckClusterConfigsForCluster", func() {
 
 		It("should correctly identify ClusterConfigs that need to be created or updated", func() {
-			env, pc, _ := defaultTestSetup("testdata", "test-02")
+			env, _ := defaultTestSetup("testdata", "test-02")
 			cluster := &clustersv1alpha1.Cluster{}
 			Expect(env.Client().Get(env.Ctx, client.ObjectKey{Namespace: "test", Name: "cluster-0"}, cluster)).To(Succeed())
 
@@ -49,7 +49,7 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 				},
 			}
 
-			ir, err := shared.CheckClusterConfigsForCluster(env.Ctx, pc, cluster, ann, nil)
+			ir, err := shared.CheckClusterConfigsForCluster(env.Ctx, env.Client(), cluster, ann, nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ir).ToNot(BeNil())
 
@@ -83,8 +83,8 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 		child12224 := "12.0.2.0/24"
 
 		It("should restore the IPAM state from a simple cluster state", func() {
-			env, pc, _ := defaultTestSetup("testdata", "test-01")
-			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, pc)).To(Succeed())
+			env, _ := defaultTestSetup("testdata", "test-01")
+			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, env.Client())).To(Succeed())
 
 			// get all CIDRs
 			cidrStrings, err := shared.IPAM.ReadAllPrefixCidrs(env.Ctx)
@@ -105,7 +105,7 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 		})
 
 		It("should restore missing ClusterConfigs from the annotation", func() {
-			env, pc, _ := defaultTestSetup("testdata", "test-02")
+			env, _ := defaultTestSetup("testdata", "test-02")
 
 			ann := ipamv1alpha1.AppliedRulesAnnotation{
 				"rule1": {
@@ -130,13 +130,12 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 			cluster.Annotations = map[string]string{}
 			cluster.Annotations[ipamv1alpha1.AppliedRulesAnnotationKey] = annString
 			Expect(env.Client().Update(env.Ctx, cluster)).To(Succeed())
-			oldCCs, err := shared.FetchClusterConfigs(env.Ctx, pc)
+			oldCCs, err := shared.FetchClusterConfigs(env.Ctx, env.Client())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(oldCCs).To(HaveLen(3))
 
-			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, pc)).To(Succeed())
-
-			newCCs, err := shared.FetchClusterConfigs(env.Ctx, pc)
+			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, env.Client())).To(Succeed())
+			newCCs, err := shared.FetchClusterConfigs(env.Ctx, env.Client())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(newCCs).To(HaveLen(4)) // one new ClusterConfig should have been created
 
@@ -159,8 +158,8 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 		})
 
 		It("should correctly restore nested CIDRs", func() {
-			env, pc, _ := defaultTestSetup("testdata", "test-03")
-			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, pc)).To(Succeed())
+			env, _ := defaultTestSetup("testdata", "test-03")
+			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, env.Client())).To(Succeed())
 
 			child10028 := "10.0.0.0/28"
 			child10030 := "10.0.0.0/30"
@@ -191,28 +190,28 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 	Context("HandleOrphanedClusterConfigs", func() {
 
 		It("should not do anything if there are no orphaned ClusterConfigs", func() {
-			env, pc, _ := defaultTestSetup("testdata", "test-01")
-			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, pc)).To(Succeed())
-			oldCCs, err := shared.FetchClusterConfigs(env.Ctx, pc)
+			env, _ := defaultTestSetup("testdata", "test-01")
+			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, env.Client())).To(Succeed())
+			oldCCs, err := shared.FetchClusterConfigs(env.Ctx, env.Client())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(oldCCs).To(HaveLen(5))
 			oldCidrs, err := shared.IPAM.ReadAllPrefixCidrs(env.Ctx)
 			Expect(err).ToNot(HaveOccurred())
 
-			remainingCCs, err := shared.HandleOrphanedClusterConfigs(env.Ctx, pc, oldCCs...)
+			remainingCCs, err := shared.HandleOrphanedClusterConfigs(env.Ctx, env.Client(), oldCCs...)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(remainingCCs).To(HaveLen(len(oldCCs)))
 			cidrs, err := shared.IPAM.ReadAllPrefixCidrs(env.Ctx)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cidrs).To(ConsistOf(oldCidrs))
-			ccs, err := shared.FetchClusterConfigs(env.Ctx, pc)
+			ccs, err := shared.FetchClusterConfigs(env.Ctx, env.Client())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ccs).To(beEqualByNameLabelsSpec(oldCCs, compareLabels, compareSpec))
 		})
 
 		It("should delete orphaned ClusterConfigs without releasing CIDRs if there is no CIDR management finalizer", func() {
-			env, pc, _ := defaultTestSetup("testdata", "test-01")
-			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, pc)).To(Succeed())
+			env, _ := defaultTestSetup("testdata", "test-01")
+			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, env.Client())).To(Succeed())
 
 			// remove cluster-0, which should allow two ClusterConfigs to be cleaned up
 			cl := &clustersv1alpha1.Cluster{}
@@ -220,7 +219,7 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 			Expect(env.Client().Delete(env.Ctx, cl)).To(Succeed())
 
 			// remove the CIDR management finalizer from the ClusterConfigs belonging to cluster-0
-			c0ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, pc, cl)
+			c0ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), cl)
 			Expect(err).ToNot(HaveOccurred())
 			for _, cc := range c0ccs {
 				old := cc.DeepCopy()
@@ -228,19 +227,19 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 				Expect(env.Client().Patch(env.Ctx, cc, client.MergeFrom(old))).To(Succeed())
 			}
 
-			oldCCs, err := shared.FetchClusterConfigs(env.Ctx, pc)
+			oldCCs, err := shared.FetchClusterConfigs(env.Ctx, env.Client())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(oldCCs).To(HaveLen(5))
 			oldCidrs, err := shared.IPAM.ReadAllPrefixCidrs(env.Ctx)
 			Expect(err).ToNot(HaveOccurred())
 
-			remainingCCs, err := shared.HandleOrphanedClusterConfigs(env.Ctx, pc, oldCCs...)
+			remainingCCs, err := shared.HandleOrphanedClusterConfigs(env.Ctx, env.Client(), oldCCs...)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(remainingCCs).To(HaveLen(len(oldCCs) - 2))
 			cidrs, err := shared.IPAM.ReadAllPrefixCidrs(env.Ctx)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cidrs).To(ConsistOf(oldCidrs))
-			ccs, err := shared.FetchClusterConfigs(env.Ctx, pc)
+			ccs, err := shared.FetchClusterConfigs(env.Ctx, env.Client())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ccs).To(HaveLen(len(oldCCs) - 2))
 			for _, cc := range ccs {
@@ -249,9 +248,9 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 		})
 
 		It("should delete orphaned ClusterConfigs and release the corresponding CIDRs if there is a CIDR management finalizer", func() {
-			env, pc, _ := defaultTestSetup("testdata", "test-01")
-			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, pc)).To(Succeed())
-			oldCCs, err := shared.FetchClusterConfigs(env.Ctx, pc)
+			env, _ := defaultTestSetup("testdata", "test-01")
+			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, env.Client())).To(Succeed())
+			oldCCs, err := shared.FetchClusterConfigs(env.Ctx, env.Client())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(oldCCs).To(HaveLen(5))
 			oldCidrs, err := shared.IPAM.ReadAllPrefixCidrs(env.Ctx)
@@ -262,14 +261,14 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 			Expect(env.Client().Get(env.Ctx, client.ObjectKey{Namespace: "test", Name: "cluster-0"}, cl)).To(Succeed())
 			Expect(env.Client().Delete(env.Ctx, cl)).To(Succeed())
 
-			remainingCCs, err := shared.HandleOrphanedClusterConfigs(env.Ctx, pc, oldCCs...)
+			remainingCCs, err := shared.HandleOrphanedClusterConfigs(env.Ctx, env.Client(), oldCCs...)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(remainingCCs).To(HaveLen(len(oldCCs) - 2))
 			cidrs, err := shared.IPAM.ReadAllPrefixCidrs(env.Ctx)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cidrs).To(HaveLen(len(oldCidrs) - 2))
 			Expect(cidrs).ToNot(ContainElements("10.0.0.0/24", "12.0.0.0/24"))
-			ccs, err := shared.FetchClusterConfigs(env.Ctx, pc)
+			ccs, err := shared.FetchClusterConfigs(env.Ctx, env.Client())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ccs).To(HaveLen(len(oldCCs) - 2))
 			for _, cc := range ccs {
