@@ -1,0 +1,10 @@
+apiVersion: gardener.clusters.openmcp.cloud/v1alpha1
+kind: IPAMConfig
+metadata:
+  name: ipam
+spec:
+  parentCIDRs:
+    foo:
+    - 10.27.0.0/16
+    bar:
+    - 10.27.0.64/16
