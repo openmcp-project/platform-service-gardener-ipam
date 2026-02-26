@@ -17,24 +17,30 @@ import (
 	ipamv1alpha1 "github.com/openmcp-project/platform-service-gardener-ipam/api/ipam/v1alpha1"
 )
 
+const ConfigValidatorName = "ConfigValidator"
+
 type ConfigValidator struct{}
 
 var _ admission.Validator[*ipamv1alpha1.IPAMConfig] = &ConfigValidator{}
 
 // ValidateCreate implements [admission.Validator].
 func (c *ConfigValidator) ValidateCreate(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig) (warnings admission.Warnings, err error) {
+	log := logging.FromContextOrDiscard(ctx).WithName(ConfigValidatorName)
+	log.Debug("Validating creation of config")
 	return nil, ValidateConfig(cfg)
 }
 
 // ValidateDelete implements [admission.Validator].
 func (c *ConfigValidator) ValidateDelete(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig) (warnings admission.Warnings, err error) {
-	log := logging.FromContextOrDiscard(ctx)
+	log := logging.FromContextOrDiscard(ctx).WithName(ConfigValidatorName)
 	log.Debug("Nothing to validate on delete")
 	return nil, nil
 }
 
 // ValidateUpdate implements [admission.Validator].
 func (c *ConfigValidator) ValidateUpdate(ctx context.Context, _ *ipamv1alpha1.IPAMConfig, newCfg *ipamv1alpha1.IPAMConfig) (warnings admission.Warnings, err error) {
+	log := logging.FromContextOrDiscard(ctx).WithName(ConfigValidatorName)
+	log.Debug("Validating update of config")
 	return nil, ValidateConfig(newCfg)
 }
 

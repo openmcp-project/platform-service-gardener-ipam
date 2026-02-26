@@ -15,19 +15,19 @@ import (
 	"github.com/openmcp-project/platform-service-gardener-ipam/internal/webhooks"
 )
 
-var testDataDir = filepath.Join("testdata", "config-validation")
+var validationTestDataDir = filepath.Join("testdata", "config-validation")
 
 var _ = Describe("Config Validation Logic", func() {
 
 	configs := map[string]*ipamv1alpha1.IPAMConfig{}
-	dirEntries, err := os.ReadDir(testDataDir)
+	dirEntries, err := os.ReadDir(validationTestDataDir)
 	Expect(err).ToNot(HaveOccurred())
 	for _, entry := range dirEntries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
 		}
 
-		data, err := os.ReadFile(filepath.Join(testDataDir, entry.Name()))
+		data, err := os.ReadFile(filepath.Join(validationTestDataDir, entry.Name()))
 		Expect(err).ToNot(HaveOccurred())
 
 		cfg := &ipamv1alpha1.IPAMConfig{}
