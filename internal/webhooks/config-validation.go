@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	goipam "github.com/metal-stack/go-ipam"
@@ -22,6 +23,14 @@ const ConfigValidatorName = "ConfigValidator"
 type ConfigValidator struct{}
 
 var _ admission.Validator[*ipamv1alpha1.IPAMConfig] = &ConfigValidator{}
+
+func (c *ConfigValidator) SetupWebhookWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	cv := &ConfigValidator{}
+
+	return ctrl.NewWebhookManagedBy(mgr, &ipamv1alpha1.IPAMConfig{}).
+		WithValidator(cv).
+		Complete()
+}
 
 // ValidateCreate implements [admission.Validator].
 func (c *ConfigValidator) ValidateCreate(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig) (warnings admission.Warnings, err error) {

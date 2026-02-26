@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/openmcp-project/controller-utils/pkg/logging"
@@ -19,6 +20,14 @@ const ReferenceInjectorName = "ReferenceInjector"
 type ReferenceInjector struct{}
 
 var _ admission.Defaulter[*clustersv1alpha1.Cluster] = &ReferenceInjector{}
+
+func (c *ReferenceInjector) SetupWebhookWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	ri := &ReferenceInjector{}
+
+	return ctrl.NewWebhookManagedBy(mgr, &clustersv1alpha1.Cluster{}).
+		WithDefaulter(ri).
+		Complete()
+}
 
 // Default implements [admission.Defaulter].
 func (c *ReferenceInjector) Default(ctx context.Context, cluster *clustersv1alpha1.Cluster) error {

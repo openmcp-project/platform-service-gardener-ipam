@@ -32,9 +32,10 @@ func NewPlatformServiceGardenerIPAMCommand() *cobra.Command {
 }
 
 type RawSharedOptions struct {
-	Environment  string `json:"environment"`
-	ProviderName string `json:"provider-name"`
-	DryRun       bool   `json:"dry-run"`
+	Environment      string `json:"environment"`
+	ProviderName     string `json:"provider-name"`
+	DryRun           bool   `json:"dry-run"`
+	WebhooksDisabled bool   `json:"disable-webhooks"`
 }
 
 type SharedOptions struct {
@@ -55,6 +56,7 @@ func (o *SharedOptions) AddPersistentFlags(cmd *cobra.Command) {
 	// provider name
 	cmd.PersistentFlags().StringVar(&o.ProviderName, "provider-name", "", "Name of the provider resource.")
 	cmd.PersistentFlags().BoolVar(&o.DryRun, "dry-run", false, "If set, the command aborts after evaluation of the given flags.")
+	cmd.PersistentFlags().BoolVar(&o.WebhooksDisabled, "disable-webhooks", false, "Disables webhooks, if set. Note that this operator will not be fully functional without the webhooks.")
 }
 
 func (o *SharedOptions) Complete() error {

@@ -83,6 +83,8 @@ Multiple selectors (except for `matchIdentity`) can be combined, in which case t
 
 If no selector is specified, all `Cluster` resources are affected by the rule.
 
+⚠️ The operator does not verify that a matching `Cluster` is actually managed by the Gardener cluster provider. If more than just that cluster provider is running in the environment, a selector is needed to prevent the operator from generating `ClusterConfig` resources for the other cluster providers' clusters.
+
 See also [here](https://github.com/openmcp-project/openmcp-operator/blob/main/docs/libraries/selectors.md) for more information and examples regarding the selectors.
 
 ## Config Modifications
