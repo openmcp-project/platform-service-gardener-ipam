@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	ctrlutils "github.com/openmcp-project/controller-utils/pkg/controller"
 	crdutil "github.com/openmcp-project/controller-utils/pkg/crds"
@@ -15,6 +16,7 @@ import (
 	clustersv1alpha1 "github.com/openmcp-project/openmcp-operator/api/clusters/v1alpha1"
 	openmcpconst "github.com/openmcp-project/openmcp-operator/api/constants"
 	libutils "github.com/openmcp-project/openmcp-operator/lib/utils"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 
 	"github.com/openmcp-project/platform-service-gardener-ipam/api/crds"
 	providerscheme "github.com/openmcp-project/platform-service-gardener-ipam/api/install"
@@ -122,6 +124,15 @@ func (o *InitOptions) Run(ctx context.Context) error {
 			Obj:       &ipamv1alpha1.IPAMConfig{},
 			Validator: true,
 			Defaulter: false,
+			Mutation: webhooks.Mutation{
+				ValidatingWebhook: func(webhook *admissionregistrationv1.ValidatingWebhook) error {
+					// We need to set the config validation webhook to 'ignore', because the manager can only be started when a config is present,
+					// but the landscape operator would be unable to create that config, because the ValidatingWebhookConfiguration would reject the request
+					// because the webhook server is not available, for which we need to start the manager first.
+					webhook.FailurePolicy = ptr.To(admissionregistrationv1.Ignore)
+					return nil
+				},
+			},
 		},
 		{
 			Obj:       &clustersv1alpha1.Cluster{},
