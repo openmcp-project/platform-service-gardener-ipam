@@ -186,10 +186,14 @@ func CheckClusterConfigsForCluster(ctx context.Context, platformCluster client.C
 		}
 	}
 
-	return &RestorationInstruction{
+	res := &RestorationInstruction{
 		ClusterConfigsToCreate: slices.Collect(maps.Values(newCCs)),
 		ClusterConfigsToUpdate: slices.Collect(maps.Values(updatedCCs)),
-	}, nil
+	}
+	for _, cc := range res.ClusterConfigsToUpdate {
+		SortPatches(cc)
+	}
+	return res, nil
 }
 
 // RestoreIPAMFromClusterState is meant to be used for initializing the shared IPAM state.

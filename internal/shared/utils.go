@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
+	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -174,6 +176,7 @@ func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID 
 			},
 		})
 	}
+	SortPatches(cc)
 
 	return cc, nil
 }
@@ -252,4 +255,38 @@ func releaseCIDRsForClusterConfig_internal(ctx context.Context, platformCluster 
 	IPAM.internal = newIpam
 
 	return nil
+}
+
+// SortPatches sorts the patches in the given ClusterConfig by the size of the injected CIDR.
+// Patches with large CIDRs (= small bitmask size) are sorted before patches with small CIDRs.
+// This avoids problems with identifying parent CIDRs when restoring the IPAM state from the ClusterConfigs, as parent CIDRs need to be restored before their child CIDRs.
+// Patches that are not "add" operations or where the injected value cannot be parsed as a CIDR are not modified in their order, as we don't know how to compare them.
+func SortPatches(cc *gardenv1alpha1.ClusterConfig) {
+	patchToSize := func(patch jsonpatchapi.JSONPatch) int {
+		if patch.Op != jsonpatchapi.ADD || patch.Value == nil {
+			return -1
+		}
+		var cidr string
+		if err := json.Unmarshal(patch.Value.Raw, &cidr); err != nil {
+			return -1
+		}
+		split := strings.Split(cidr, "/")
+		if len(split) != 2 {
+			return -1
+		}
+		size, err := strconv.Atoi(split[1])
+		if err != nil {
+			return -1
+		}
+		return size
+	}
+
+	slices.SortStableFunc(cc.Spec.Patches, func(a, b jsonpatchapi.JSONPatch) int {
+		aSize := patchToSize(a)
+		bSize := patchToSize(b)
+		if aSize < 0 || bSize < 0 {
+			return 0
+		}
+		return aSize - bSize
+	})
 }
