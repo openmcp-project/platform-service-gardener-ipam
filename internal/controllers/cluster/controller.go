@@ -67,11 +67,10 @@ func NewIPAMClusterController(platformCluster *clusters.Cluster, er events.Event
 }
 
 type ReconcileResult struct {
-	Cluster       *clustersv1alpha1.Cluster
-	ClusterConfig *gardenv1alpha1.ClusterConfig
-	EventAction   string
-	Result        reconcile.Result
-	Error         error
+	Cluster     *clustersv1alpha1.Cluster
+	EventAction string
+	Result      reconcile.Result
+	Error       error
 }
 
 func (rr *ReconcileResult) defaultedEventAction() string {
@@ -90,11 +89,11 @@ func (c *IPAMClusterController) Reconcile(ctx context.Context, req reconcile.Req
 	if c.er != nil {
 		if rr.Error != nil {
 			if rr.Cluster != nil {
-				c.er.Eventf(rr.Cluster, rr.ClusterConfig, corev1.EventTypeWarning, "ReconcileError", rr.defaultedEventAction(), "Reconcile failed: %v", rr.Error)
+				c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, "ReconcileError", rr.defaultedEventAction(), "Reconcile failed: %v", rr.Error)
 			}
 		} else {
 			if rr.Cluster != nil {
-				c.er.Eventf(rr.Cluster, rr.ClusterConfig, corev1.EventTypeNormal, "ReconcileSuccess", rr.defaultedEventAction(), "Reconcile successful")
+				c.er.Eventf(rr.Cluster, nil, corev1.EventTypeNormal, "ReconcileSuccess", rr.defaultedEventAction(), "Reconcile successful")
 			}
 		}
 	}
