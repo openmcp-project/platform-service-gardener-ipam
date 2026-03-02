@@ -30,6 +30,13 @@ import (
 	ipamv1alpha1 "github.com/openmcp-project/platform-service-gardener-ipam/api/ipam/v1alpha1"
 )
 
+const (
+	// EmptyClusterNamePlaceholder is a placeholder that will be used as a ClusterConfig reference, if the Cluster it is to be generated for has no name yet
+	// (which can happen during the initial creation if the Cluster has generateName set instead of name).
+	// ClusterConfigs with this name will not be created and this is the only reference which will be removed from the Cluster's reference list during reconciliation.
+	EmptyClusterNamePlaceholder = "ipam-empty-cluster-name-placeholder"
+)
+
 // ClusterConfigLabels returns the labels that should be set on a ClusterConfig for the given cluster and ruleID.
 // For creating selectors, the cl as well as the ruleID arguments can be empty, in which case the returned labels will not contain the corresponding keys.
 func ClusterConfigLabels(cl *clustersv1alpha1.Cluster, ruleID string) map[string]string {
@@ -186,6 +193,9 @@ func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID 
 func GenerateClusterConfigName(cl *clustersv1alpha1.Cluster, ruleID string) (string, error) {
 	if cl == nil || ruleID == "" {
 		return "", fmt.Errorf("cluster and ruleID must not be nil or empty")
+	}
+	if cl.Name == "" {
+		return EmptyClusterNamePlaceholder, nil
 	}
 	ccName, err := ctrlutils.ShortenToXCharacters(fmt.Sprintf("%s--ipam--%s", cl.Name, ruleID), ctrlutils.K8sMaxNameLength)
 	if err != nil {

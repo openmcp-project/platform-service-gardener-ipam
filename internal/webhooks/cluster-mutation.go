@@ -41,6 +41,7 @@ func (c *ReferenceInjector) Default(ctx context.Context, cluster *clustersv1alph
 	}
 
 	// generate list of ClusterConfig references to inject into the cluster based on the config
+	generatedPlaceholder := false
 	refs := map[string]string{} // maps reference name to rule ID, used for logging purposes
 	for _, rule := range cfg.Spec.InjectionRules {
 		if rule.Matches(cluster) {
@@ -48,7 +49,30 @@ func (c *ReferenceInjector) Default(ctx context.Context, cluster *clustersv1alph
 			if err != nil {
 				return fmt.Errorf("failed to generate ClusterConfig name for rule '%s': %w", rule.ID, err)
 			}
-			refs[name] = rule.ID
+			if name == shared.EmptyClusterNamePlaceholder {
+				generatedPlaceholder = true
+				log.Info("Injected placeholder reference because Cluster's name could not be determined")
+				refs[name] = ""
+				// we can break here because the placeholder will be injected for all rules and we don't want to log multiple times
+				break
+			} else {
+				refs[name] = rule.ID
+			}
+		}
+	}
+
+	// If no placeholder was generated, we can delete any existing placeholder reference, as it is no longer needed.
+	if !generatedPlaceholder {
+		placeholderIndex := -1
+		for i, existing := range cluster.Spec.ClusterConfigs {
+			if existing.Name == shared.EmptyClusterNamePlaceholder {
+				placeholderIndex = i
+				break
+			}
+		}
+		if placeholderIndex != -1 {
+			log.Info("Removing placeholder reference because Cluster's name can now be determined")
+			cluster.Spec.ClusterConfigs = append(cluster.Spec.ClusterConfigs[:placeholderIndex], cluster.Spec.ClusterConfigs[placeholderIndex+1:]...)
 		}
 	}
 

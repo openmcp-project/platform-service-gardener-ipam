@@ -389,7 +389,10 @@ func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *cluste
 			allErrs = append(allErrs, fmt.Errorf("error generating ClusterConfig for injection rule '%s': %w", rule.ID, err))
 			continue
 		}
-		res.ClusterConfigsToCreate = append(res.ClusterConfigsToCreate, newCC)
+		if newCC != nil && newCC.Name != shared.EmptyClusterNamePlaceholder {
+			// do not create placeholder ClusterConfigs
+			res.ClusterConfigsToCreate = append(res.ClusterConfigsToCreate, newCC)
+		}
 	}
 
 	return res, EventActionCIDRGeneration, errors.Join(allErrs...)

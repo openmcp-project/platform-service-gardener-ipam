@@ -147,6 +147,9 @@ func CheckClusterConfigsForCluster(ctx context.Context, platformCluster client.C
 				errs = errors.Join(errs, fmt.Errorf("error generating ClusterConfig for rule '%s': %w", ruleID, err))
 				continue
 			}
+			if newCC == nil || newCC.Name == EmptyClusterNamePlaceholder {
+				continue
+			}
 			newCCs[ruleID] = newCC
 		} else {
 			// ClusterConfig exists, add missing injections to it
