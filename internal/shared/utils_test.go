@@ -81,7 +81,7 @@ var _ = Describe("Shared Utils Functions", Serial, func() {
 			Expect(cc.Labels).To(HaveKeyWithValue(ipamv1alpha1.ClusterTargetLabel, cl.Name))
 			Expect(cc.Labels).To(HaveKeyWithValue(ipamv1alpha1.InjectionRuleLabel, ruleID))
 			Expect(cc.OwnerReferences).To(ConsistOf(MatchFields(IgnoreExtras, Fields{
-				"APIVersion":         Equal(gardenv1alpha1.GroupVersion.String()),
+				"APIVersion":         Equal(clustersv1alpha1.GroupVersion.String()),
 				"Kind":               Equal("Cluster"),
 				"Name":               Equal(cl.Name),
 				"UID":                Equal(cl.UID),
