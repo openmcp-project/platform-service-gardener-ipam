@@ -372,7 +372,7 @@ func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *cluste
 		}
 
 		if _, hasIssue := res.RulesWithIssues[rule.ID]; hasIssue {
-			log.Debug("Skipping CIDR injection rule due to issues", "id", rule.ID, "issue", res.RulesWithIssues[rule.ID])
+			log.Info("Skipping CIDR injection rule due to issues", "id", rule.ID, "issue", res.RulesWithIssues[rule.ID])
 			continue
 		}
 
@@ -383,6 +383,7 @@ func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *cluste
 			continue
 		}
 		res.AnnotationToApply[rule.ID] = injections
+		log.Info("Generated injections for rule", "ruleID", rule.ID, "injections", injections)
 
 		newCC, err := shared.GenerateClusterConfigForInjectionList(cl, rule.ID, injections)
 		if err != nil {
