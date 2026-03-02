@@ -143,7 +143,7 @@ func GenerateClusterConfigForInjectionList(cl *clustersv1alpha1.Cluster, ruleID 
 			Labels:    ClusterConfigLabels(cl, ruleID),
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         ipamv1alpha1.GroupVersion.String(),
+					APIVersion:         clustersv1alpha1.GroupVersion.String(),
 					Kind:               "Cluster",
 					Name:               cl.Name,
 					UID:                cl.UID,
