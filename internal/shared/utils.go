@@ -297,6 +297,9 @@ func SortPatches(cc *gardenv1alpha1.ClusterConfig) {
 		if aSize < 0 || bSize < 0 {
 			return 0
 		}
-		return aSize - bSize
+		if aSize != bSize {
+			return aSize - bSize
+		}
+		return strings.Compare(a.Path, b.Path)
 	})
 }
