@@ -27,6 +27,7 @@ import (
 	"github.com/openmcp-project/platform-service-gardener-ipam/internal/controllers/cluster"
 	"github.com/openmcp-project/platform-service-gardener-ipam/internal/controllers/config"
 	"github.com/openmcp-project/platform-service-gardener-ipam/internal/shared"
+	"github.com/openmcp-project/platform-service-gardener-ipam/internal/webhooks"
 )
 
 var setupLog logging.Logger
@@ -264,6 +265,16 @@ func (o *RunOptions) Run(ctx context.Context) error {
 	clusterCtrl := cluster.NewIPAMClusterController(o.PlatformCluster, mgr.GetEventRecorder(cluster.ControllerName))
 	if err := clusterCtrl.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to add Cluster reconciler to manager: %w", err)
+	}
+
+	// setup webhooks, unless disabled
+	if !o.WebhooksDisabled {
+		if err := (&webhooks.ConfigValidator{}).SetupWebhookWithManager(ctx, mgr); err != nil {
+			return fmt.Errorf("unable to set up IPAMConfig validation webhook: %w", err)
+		}
+		if err := (&webhooks.ReferenceInjector{}).SetupWebhookWithManager(ctx, mgr); err != nil {
+			return fmt.Errorf("unable to set up Cluster reference injection webhook: %w", err)
+		}
 	}
 
 	if o.MetricsCertWatcher != nil {

@@ -343,7 +343,7 @@ func ipamFromClusterConfigs(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, c
 			}
 			var cidr string
 			if err := json.Unmarshal(patch.Value.Raw, &cidr); err != nil {
-				return nil, fmt.Errorf("error unmarshaling CIDR from ClusterConfig '%s/%s' patch path '%s' (indes %d): %w", cc.Namespace, cc.Name, patch.Path, idx, err)
+				return nil, fmt.Errorf("error unmarshaling CIDR from ClusterConfig '%s/%s' patch path '%s' (index %d): %w", cc.Namespace, cc.Name, patch.Path, idx, err)
 			}
 			// figure out the parent CIDR
 			parent, err := identifyParentPrefix(cidr, reverse(tmpParents), parents)

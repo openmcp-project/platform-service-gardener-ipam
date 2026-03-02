@@ -1,0 +1,45 @@
+apiVersion: gardener.clusters.openmcp.cloud/v1alpha1
+kind: IPAMConfig
+metadata:
+  name: ipam
+spec:
+  internalStateRefreshCycleDuration: 24h
+  parentCIDRs:
+    foo:
+    - 10.27.0.0/16
+    bar:
+    - 10.28.0.0/24
+  injectionRules:
+  - id: mcp-clusters
+    matchPurposes:
+    - operator: ContainsAll
+      values:
+      - mcp
+    injections:
+    - path: .spec.network.cidr
+      parents:
+      - foo
+      - bar
+      subnetSize: 28 # requests a /28 CIDR
+  - id: test
+    matchLabels:
+      clusters.openmcp.cloud/test: "true"
+    matchPurposes:
+    - operator: ContainsNone
+      values:
+      - mcp
+      - onboarding
+      - platform
+      - workload
+    injections:
+    - id: test-cidr
+      path: /spec/network/subnetA
+      parents:
+      - foo # refers to the 'foo' parent CIDR defined above
+      subnetSize: 24
+    - path: .spec.network.subnetB
+      parents:
+      - test-cidr # refers to the CIDR injected for the previous injection
+      subnetSize: 30
+    - path: .spec.network.subnetC
+      subnetSize: 30
