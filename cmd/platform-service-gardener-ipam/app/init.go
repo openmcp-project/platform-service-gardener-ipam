@@ -72,7 +72,7 @@ func (o *InitOptions) Complete(ctx context.Context) error {
 }
 
 func (o *InitOptions) Run(ctx context.Context) error {
-	if err := o.PlatformCluster.InitializeClient(providerscheme.InstallCRDAPIs(runtime.NewScheme())); err != nil {
+	if err := o.PlatformCluster.InitializeClient(providerscheme.InstallOperatorAPIsPlatform(providerscheme.InstallCRDAPIs(runtime.NewScheme()))); err != nil {
 		return err
 	}
 
