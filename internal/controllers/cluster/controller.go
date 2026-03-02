@@ -191,21 +191,24 @@ func (c *IPAMClusterController) handleCreateOrUpdate(ctx context.Context, rr Rec
 		if len(ir.AnnotationToApply) > 0 {
 			annotationValue, err := ir.AnnotationToApply.ToAnnotation()
 			if err != nil {
-				errs = errors.Join(errs, fmt.Errorf("unable to serialize applied rules annotation: %w", err))
+				errs = errors.Join(errs, fmt.Errorf("unable to serialize 'applied rules' annotation: %w", err))
 				if c.er != nil {
-					c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not convert CIDR annotation value into JSON: %s", err.Error())
+					c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not convert 'applied rules' annotation value into JSON: %s", err.Error())
 				}
 			}
-			log.Debug("Applying annotation to Cluster", "value", annotationValue)
-			old := rr.Cluster.DeepCopy()
-			if rr.Cluster.Annotations == nil {
-				rr.Cluster.Annotations = map[string]string{}
-			}
-			rr.Cluster.Annotations[ipamv1alpha1.AppliedRulesAnnotationKey] = annotationValue
-			if err := c.PlatformCluster.Client().Patch(ctx, rr.Cluster, client.MergeFrom(old)); err != nil {
-				errs = errors.Join(errs, fmt.Errorf("unable to update Cluster with applied rules annotation: %w", err))
-				if c.er != nil {
-					c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not update Cluster with applied rules annotation: %s", err.Error())
+			oldAnnotation := rr.Cluster.Annotations[ipamv1alpha1.AppliedRulesAnnotationKey]
+			if annotationValue != oldAnnotation {
+				log.Debug("Applying changed 'applied rules' annotation to Cluster", "value", annotationValue)
+				old := rr.Cluster.DeepCopy()
+				if rr.Cluster.Annotations == nil {
+					rr.Cluster.Annotations = map[string]string{}
+				}
+				rr.Cluster.Annotations[ipamv1alpha1.AppliedRulesAnnotationKey] = annotationValue
+				if err := c.PlatformCluster.Client().Patch(ctx, rr.Cluster, client.MergeFrom(old)); err != nil {
+					errs = errors.Join(errs, fmt.Errorf("unable to update Cluster with 'applied rules' annotation: %w", err))
+					if c.er != nil {
+						c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not update Cluster with 'applied rules' annotation: %s", err.Error())
+					}
 				}
 			}
 		}
