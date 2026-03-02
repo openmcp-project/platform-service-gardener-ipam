@@ -123,7 +123,7 @@ func (c *IPAMConfigController) reconcile(ctx context.Context, req reconcile.Requ
 		oldCfg := shared.GetConfig()
 		if oldCfg == nil || !reflect.DeepEqual(oldCfg.Spec.InjectionRules, cfg.Spec.InjectionRules) {
 			log.Info("Injection rules have changed, queuing all clusters that match any injection rule")
-			affectedClusters, err := shared.FetchRelevantClusters(ctx, cfg, c.PlatformCluster)
+			affectedClusters, err := shared.FetchRelevantClusters(ctx, cfg, c.PlatformCluster.Client())
 			if err != nil {
 				return nil, reconcile.Result{}, fmt.Errorf("error fetching affected clusters: %w", err)
 			}
@@ -149,7 +149,7 @@ func (c *IPAMConfigController) reconcile(ctx context.Context, req reconcile.Requ
 
 	if cfg.Spec.InternalStateRefreshCycleDuration != nil && cfg.Spec.InternalStateRefreshCycleDuration.Duration > 0 && time.Now().After(c.lastRefreshTime.Add(cfg.Spec.InternalStateRefreshCycleDuration.Duration)) {
 		// refresh internal state by reloading it from the cluster state
-		if err := shared.RestoreIPAMFromClusterState(ctx, c.PlatformCluster); err != nil {
+		if err := shared.RestoreIPAMFromClusterState(ctx, c.PlatformCluster.Client()); err != nil {
 			return nil, reconcile.Result{}, fmt.Errorf("error refreshing internal IPAM state: %w", err)
 		}
 		c.lastRefreshTime = time.Now()

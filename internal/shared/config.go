@@ -10,7 +10,7 @@ import (
 
 var (
 	config       *ipamv1alpha1.IPAMConfig
-	lock         *sync.RWMutex
+	configLock   *sync.RWMutex
 	ClusterWatch chan event.GenericEvent
 	IPAM         *Ipamer
 	providerName string
@@ -18,19 +18,19 @@ var (
 )
 
 func init() {
-	lock = &sync.RWMutex{}
+	configLock = &sync.RWMutex{}
 	ClusterWatch = make(chan event.GenericEvent, 1024)
 }
 
 func GetConfig() *ipamv1alpha1.IPAMConfig {
-	lock.RLock()
-	defer lock.RUnlock()
+	configLock.RLock()
+	defer configLock.RUnlock()
 	return config.DeepCopy()
 }
 
 func SetConfig(cfg *ipamv1alpha1.IPAMConfig) {
-	lock.Lock()
-	defer lock.Unlock()
+	configLock.Lock()
+	defer configLock.Unlock()
 	config = cfg.DeepCopy()
 }
 

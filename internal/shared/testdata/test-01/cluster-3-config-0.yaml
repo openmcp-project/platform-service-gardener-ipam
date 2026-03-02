@@ -1,0 +1,18 @@
+apiVersion: gardener.clusters.openmcp.cloud/v1alpha1
+kind: ClusterConfig
+metadata:
+  name: cluster-3--ipam--rule-old
+  namespace: test
+  finalizers:
+  - ipam.gardener.clusters.openmcp.cloud/cidr-management
+  labels:
+    openmcp.cloud/managed-by: ipam
+    openmcp.cloud/managed-purpose: gardener-ipam
+    openmcp.cloud/environment: test
+    ipam.gardener.clusters.openmcp.cloud/cluster: cluster-3
+    ipam.gardener.clusters.openmcp.cloud/injection-rule: rule-old
+spec:
+  patches:
+  - op: add
+    path: /spec/networking/services
+    value: 13.0.3.0/24

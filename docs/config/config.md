@@ -12,8 +12,10 @@ metadata:
 spec:
   internalStateRefreshCycleDuration: 24h # optional
   parentCIDRs:
-    foo: 10.27.0.0/16
-    bar: 10.28.0.0/24
+    foo:
+    - 10.27.0.0/16
+    bar:
+    - 10.28.0.0/24
   injectionRules:
   - id: mcp-clusters
     matchPurposes:
@@ -53,7 +55,7 @@ spec:
 The purpose of the Gardener-IPAM platform service is to inject disjunct CIDRs into shoot manifests created for `Cluster` resources that match certain criteria. The following fields in its `spec` can be used to control its behavior:
 
 - `internalStateRefreshCycleDuration` *(optional)*: If set to a non-zero duration, the controller will discard its internal state (see below) and recover it from resources in the cluster (the same way it is recovered when the controller is started) after the specified time has elapsed. This can be used to mitigate potential bugs or other problems which cause the internal state to get out of sync with the cluster state. If not specified, no periodic state refreshing will happen.
-- `parentCIDRs`: Defines a mapping from arbitrarily chosen identifiers to parent CIDRs from which the disjunct child CIDRs will be sliced. The identifiers are used to refer to the individual parent CIDRs in the injection rules, which allows different rules to use different sets of parent CIDRs.
+- `parentCIDRs`: Defines a mapping from arbitrarily chosen identifiers to lists of parent CIDRs from which the disjunct child CIDRs will be sliced (traversing the list from top to bottom until a parent CIDR with enough capacity is found). The identifiers are used to refer to the individual parent CIDR lists in the injection rules, which allows different rules to use different sets of parent CIDRs.
 - `injectionRules`: The actual definition of which size of CIDR to slice from which parent CIDR(s) and where to inject it in the shoot manifest. Note that multiple injection rules can be specified, while each individual rule can also inject multiple CIDRs - use multiple rules if you want to differentiate between multiple `Cluster` types (see '[Selectors](#selectors)' below) and multiple injections with in the same rule if you need to inject more than one CIDR into the shoot manifest.
   - `id`: Used to identify individual injection rules. Mainly for logging and debugging purposes, but this is also used as a label value and as part of a generated resource name, so it subject to the usual kubernetes naming conventions. Must be unique among all injection rules.
   - `matchIdentities`/`matchPurposes`/`matchLabels`/`matchExpressions`: These fields allow specifing filters for which `Cluster` resources this rule should apply to. They are explained in more detail in the [corresponding section](#selectors) below.

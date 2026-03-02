@@ -1,0 +1,9 @@
+apiVersion: gardener.clusters.openmcp.cloud/v1alpha1
+kind: ClusterConfig
+metadata:
+  name: asdf
+  namespace: test
+spec:
+  patches:
+  - op: remove
+    path: /spec/networking/pods

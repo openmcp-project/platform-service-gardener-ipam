@@ -1,0 +1,16 @@
+apiVersion: clusters.openmcp.cloud/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-0
+  namespace: test
+  labels:
+    openmcp.cloud/test: "true"
+spec:
+  profile: garden-small
+  purposes:
+  - test-0
+  - test-2
+  tenancy: Shared
+  clusterConfigs:
+  - name: cluster-0--ipam--rule1
+  - name: cluster-0--ipam--rule2

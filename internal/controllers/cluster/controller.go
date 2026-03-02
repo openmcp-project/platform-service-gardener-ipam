@@ -14,7 +14,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -22,7 +21,7 @@ import (
 
 	goipam "github.com/metal-stack/go-ipam"
 
-	gardenerv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
+	gardenv1alpha1 "github.com/openmcp-project/cluster-provider-gardener/api/core/v1alpha1"
 	"github.com/openmcp-project/controller-utils/pkg/clusters"
 	"github.com/openmcp-project/controller-utils/pkg/collections"
 	ctrlutils "github.com/openmcp-project/controller-utils/pkg/controller"
@@ -69,7 +68,7 @@ func NewIPAMClusterController(platformCluster *clusters.Cluster, er events.Event
 
 type ReconcileResult struct {
 	Cluster       *clustersv1alpha1.Cluster
-	ClusterConfig *gardenerv1alpha1.ClusterConfig
+	ClusterConfig *gardenv1alpha1.ClusterConfig
 	EventAction   string
 	Result        reconcile.Result
 	Error         error
@@ -174,7 +173,7 @@ func (c *IPAMClusterController) handleCreateOrUpdate(ctx context.Context, rr Rec
 	cfg := shared.GetConfig()
 
 	// fetch all ClusterConfigs managed by this controller for this Cluster
-	ccs, err := shared.FetchClusterConfigsForCluster(ctx, c.PlatformCluster, rr.Cluster)
+	ccs, err := shared.FetchClusterConfigsForCluster(ctx, c.PlatformCluster.Client(), rr.Cluster)
 	if err != nil {
 		return ReconcileResult{Cluster: rr.Cluster, EventAction: EventActionEvaluatingExistingClusterConfigs, Error: fmt.Errorf("error fetching ClusterConfigs for Cluster: %w", err)}
 	}
@@ -182,7 +181,7 @@ func (c *IPAMClusterController) handleCreateOrUpdate(ctx context.Context, rr Rec
 	// manage CIDR injections
 	log.Debug("Managing CIDR injections")
 	ir, eventAction, err := c.ManageInjections(ctx, rr.Cluster, cfg, applicableRules, ccs)
-	if err != nil {
+	if err != nil && c.er != nil {
 		c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, eventAction, "an error occurred during CIDR injection management: %s", err.Error())
 	}
 	errs := err
@@ -194,7 +193,9 @@ func (c *IPAMClusterController) handleCreateOrUpdate(ctx context.Context, rr Rec
 			annotationValue, err := ir.AnnotationToApply.ToAnnotation()
 			if err != nil {
 				errs = errors.Join(errs, fmt.Errorf("unable to serialize applied rules annotation: %w", err))
-				c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not convert CIDR annotation value into JSON: %s", err.Error())
+				if c.er != nil {
+					c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not convert CIDR annotation value into JSON: %s", err.Error())
+				}
 			}
 			log.Debug("Applying annotation to Cluster", "value", annotationValue)
 			old := rr.Cluster.DeepCopy()
@@ -204,14 +205,16 @@ func (c *IPAMClusterController) handleCreateOrUpdate(ctx context.Context, rr Rec
 			rr.Cluster.Annotations[ipamv1alpha1.AppliedRulesAnnotationKey] = annotationValue
 			if err := c.PlatformCluster.Client().Patch(ctx, rr.Cluster, client.MergeFrom(old)); err != nil {
 				errs = errors.Join(errs, fmt.Errorf("unable to update Cluster with applied rules annotation: %w", err))
-				c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not update Cluster with applied rules annotation: %s", err.Error())
+				if c.er != nil {
+					c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not update Cluster with applied rules annotation: %s", err.Error())
+				}
 			}
 		}
 
 		// create/update ClusterConfigs
 		countCreate, countUpdate := ir.Size()
 		log.Debug("Creating/Updating ClusterConfigs", "countCreate", countCreate, "countUpdate", countUpdate)
-		if err := ir.Apply(ctx, c.PlatformCluster); err != nil {
+		if err := ir.Apply(ctx, c.PlatformCluster.Client()); err != nil {
 			errs = errors.Join(errs, err)
 		}
 	}
@@ -219,13 +222,17 @@ func (c *IPAMClusterController) handleCreateOrUpdate(ctx context.Context, rr Rec
 	// log rules which were skipped due to issues
 	for ruleID, issue := range ir.RulesWithIssues {
 		errs = errors.Join(errs, fmt.Errorf("problem with injection rule '%s': %w", ruleID, issue))
-		c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionEvaluatingRulesToApply, "skipped injection rule '%s' due to issue: %s", ruleID, issue.Error())
+		if c.er != nil {
+			c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionEvaluatingRulesToApply, "skipped injection rule '%s' due to issue: %s", ruleID, issue.Error())
+		}
 	}
 
 	// log rules which were skipped because they had already been applied before
 	for ruleID := range ir.SkippedBecauseAlreadyAppliedRules {
 		log.Debug("Skipped rule which had already been applied before", "id", ruleID)
-		c.er.Eventf(rr.Cluster, nil, corev1.EventTypeNormal, EventReasonCIDRManagementError, EventActionEvaluatingRulesToApply, "skipped injection rule '%s' because it had already been applied before", ruleID)
+		if c.er != nil {
+			c.er.Eventf(rr.Cluster, nil, corev1.EventTypeNormal, EventReasonCIDRManagementError, EventActionEvaluatingRulesToApply, "skipped injection rule '%s' because it had already been applied before", ruleID)
+		}
 	}
 
 	rr.Error = errs
@@ -238,23 +245,16 @@ func (c *IPAMClusterController) handleDelete(ctx context.Context, req reconcile.
 
 	// This method is executed after the Cluster resource has been deleted.
 	// We need to identify all ClusterConfigs that belonged to this Cluster, free the corresponding CIDRs and remove the finalizers from the ClusterConfigs.
-	ccs := &gardenerv1alpha1.ClusterConfigList{}
-	if err := c.PlatformCluster.Client().List(ctx, ccs, client.MatchingLabels(shared.ClusterConfigLabels(&clustersv1alpha1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: req.Name, Namespace: req.Namespace}}, "")), client.InNamespace(req.Namespace)); err != nil {
-		return fmt.Errorf("unable to list ClusterConfig resources: %w", err)
+	ccs, err := shared.FetchClusterConfigsForCluster(ctx, c.PlatformCluster.Client(), &clustersv1alpha1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: req.Name, Namespace: req.Namespace}})
+	if err != nil {
+		return fmt.Errorf("error fetching ClusterConfigs for deleted Cluster: %w", err)
 	}
-	log.Debug("Fetched ClusterConfig resources that belonged to the deleted Cluster", "count", len(ccs.Items))
+	log.Debug("Fetched ClusterConfig resources that belonged to the deleted Cluster", "count", len(ccs))
 
 	var errs error
-	for _, cc := range ccs.Items {
-		if err := shared.ReleaseCIDRsForClusterConfig(ctx, &cc); err != nil {
+	for _, cc := range ccs {
+		if err := shared.ReleaseCIDRsForClusterConfig(ctx, c.PlatformCluster.Client(), cc); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("error trying to release CIDRs from ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
-		} else {
-			log.Debug("Successfully released CIDRs for ClusterConfig, removing finalizer", "ClusterConfig", fmt.Sprintf("%s/%s", cc.Namespace, cc.Name))
-			old := cc.DeepCopy()
-			controllerutil.RemoveFinalizer(&cc, ipamv1alpha1.CIDRReleaseFinalizer)
-			if err := c.PlatformCluster.Client().Patch(ctx, &cc, client.MergeFrom(old)); err != nil {
-				errs = errors.Join(errs, fmt.Errorf("unable to remove finalizer from ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
-			}
 		}
 	}
 
@@ -279,7 +279,7 @@ type InjectionManagementResult struct {
 // None of the passed-in objects is modified, nor does any interaction with the platform cluster happen here.
 // RulesWithIssues will contain one entry for each rule in applicableRules that would inject a CIDR in a path where another rule has already injected a CIDR into. Only rules which would result in new ClusterConfigs are considered here, conflicting updates for existing ClusterConfigs are simply ignored.
 // This function may still return a non-nil InjectionManagementResult, even if an error occurred. In this case, the returned result should be applied, because the internal CIDR management state has changed according to it.
-func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *clustersv1alpha1.Cluster, cfg *ipamv1alpha1.IPAMConfig, applicableRules []ipamv1alpha1.CIDRInjection, ccs map[string]*gardenerv1alpha1.ClusterConfig) (*InjectionManagementResult, string, error) {
+func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *clustersv1alpha1.Cluster, cfg *ipamv1alpha1.IPAMConfig, applicableRules []ipamv1alpha1.CIDRInjection, ccs map[string]*gardenv1alpha1.ClusterConfig) (*InjectionManagementResult, string, error) {
 	log := logging.FromContextOrPanic(ctx)
 	allErrs := []error{}
 
@@ -332,7 +332,7 @@ func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *cluste
 	}
 
 	var err error
-	res.RestorationInstruction, err = shared.CheckClusterConfigsForCluster(ctx, c.PlatformCluster, cl, appliedRules, ccs)
+	res.RestorationInstruction, err = shared.CheckClusterConfigsForCluster(ctx, c.PlatformCluster.Client(), cl, appliedRules, ccs)
 	if err != nil {
 		return nil, EventActionEvaluatingMissingInjections, fmt.Errorf("errors occurred while evaluating missing injections:\n%w", err)
 	}
@@ -383,6 +383,7 @@ func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *cluste
 			allErrs = append(allErrs, fmt.Errorf("error generating CIDRs for injection rule '%s': %w", rule.ID, err))
 			continue
 		}
+		res.AnnotationToApply[rule.ID] = injections
 
 		newCC, err := shared.GenerateClusterConfigForInjectionList(cl, rule.ID, injections)
 		if err != nil {
@@ -445,7 +446,7 @@ func generateCIDRsForInjectionRule(ctx context.Context, rule *ipamv1alpha1.CIDRI
 				plog.Debug("Successfully generated child CIDR", "childCidr", cPrefix.Cidr)
 				raw[injection.Path] = cPrefix
 				if injection.ID != "" {
-					tmpParents[injection.ID] = []*goipam.Prefix{prefix}
+					tmpParents[injection.ID] = []*goipam.Prefix{cPrefix}
 				}
 				success = true
 				break
@@ -509,7 +510,7 @@ func (c *IPAMClusterController) SetupWithManager(mgr ctrl.Manager) error {
 			),
 		))).
 		// watch owned ClusterConfig resources with the fitting labels
-		Owns(&gardenerv1alpha1.ClusterConfig{}, builder.WithPredicates(predicate.And(
+		Owns(&gardenv1alpha1.ClusterConfig{}, builder.WithPredicates(predicate.And(
 			ctrlutils.HasLabelPredicate(openmcpconst.ManagedByLabel, shared.ProviderName()),
 			ctrlutils.HasLabelPredicate(openmcpconst.ManagedPurposeLabel, ipamv1alpha1.ManagedPurposeLabelValue),
 			ctrlutils.HasLabelPredicate(openmcpconst.EnvironmentLabel, shared.Environment()),
