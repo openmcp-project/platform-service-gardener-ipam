@@ -258,6 +258,10 @@ func (c *IPAMClusterController) handleDelete(ctx context.Context, req reconcile.
 		if err := shared.ReleaseCIDRsForClusterConfig(ctx, c.PlatformCluster.Client(), cc); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("error trying to release CIDRs from ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
 		}
+		// we can delete even if the CIDR release failed, because the ClusterConfig will have a finalizer left in that case
+		if err := c.PlatformCluster.Client().Delete(ctx, cc); client.IgnoreNotFound(err) != nil {
+			errs = errors.Join(errs, fmt.Errorf("error trying to delete ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
+		}
 	}
 
 	return errs
