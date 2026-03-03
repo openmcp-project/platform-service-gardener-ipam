@@ -147,6 +147,9 @@ func CheckClusterConfigsForCluster(ctx context.Context, platformCluster client.C
 				errs = errors.Join(errs, fmt.Errorf("error generating ClusterConfig for rule '%s': %w", ruleID, err))
 				continue
 			}
+			if newCC == nil || newCC.Name == EmptyClusterNamePlaceholder {
+				continue
+			}
 			newCCs[ruleID] = newCC
 		} else {
 			// ClusterConfig exists, add missing injections to it
@@ -186,10 +189,14 @@ func CheckClusterConfigsForCluster(ctx context.Context, platformCluster client.C
 		}
 	}
 
-	return &RestorationInstruction{
+	res := &RestorationInstruction{
 		ClusterConfigsToCreate: slices.Collect(maps.Values(newCCs)),
 		ClusterConfigsToUpdate: slices.Collect(maps.Values(updatedCCs)),
-	}, nil
+	}
+	for _, cc := range res.ClusterConfigsToUpdate {
+		SortPatches(cc)
+	}
+	return res, nil
 }
 
 // RestoreIPAMFromClusterState is meant to be used for initializing the shared IPAM state.

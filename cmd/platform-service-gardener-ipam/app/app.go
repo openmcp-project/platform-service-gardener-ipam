@@ -10,6 +10,8 @@ import (
 
 	"github.com/openmcp-project/controller-utils/pkg/clusters"
 	"github.com/openmcp-project/controller-utils/pkg/logging"
+
+	"github.com/openmcp-project/platform-service-gardener-ipam/internal/shared"
 )
 
 func NewPlatformServiceGardenerIPAMCommand() *cobra.Command {
@@ -63,9 +65,11 @@ func (o *SharedOptions) Complete() error {
 	if o.Environment == "" {
 		return fmt.Errorf("environment must not be empty")
 	}
+	shared.SetEnvironment(o.Environment)
 	if o.ProviderName == "" {
 		return fmt.Errorf("provider-name must not be empty")
 	}
+	shared.SetProviderName(o.ProviderName)
 
 	// build logger
 	log, err := logging.GetLogger()

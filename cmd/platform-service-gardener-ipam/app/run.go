@@ -206,6 +206,7 @@ func (o *RunOptions) Run(ctx context.Context) error {
 	}
 
 	setupLog = o.Log.WithName("setup")
+	ctx = logging.NewContext(ctx, setupLog)
 	setupLog.Info("Environment", "value", o.Environment)
 	setupLog.Info("ProviderName", "value", o.ProviderName)
 

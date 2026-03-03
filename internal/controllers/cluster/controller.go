@@ -67,11 +67,10 @@ func NewIPAMClusterController(platformCluster *clusters.Cluster, er events.Event
 }
 
 type ReconcileResult struct {
-	Cluster       *clustersv1alpha1.Cluster
-	ClusterConfig *gardenv1alpha1.ClusterConfig
-	EventAction   string
-	Result        reconcile.Result
-	Error         error
+	Cluster     *clustersv1alpha1.Cluster
+	EventAction string
+	Result      reconcile.Result
+	Error       error
 }
 
 func (rr *ReconcileResult) defaultedEventAction() string {
@@ -90,11 +89,11 @@ func (c *IPAMClusterController) Reconcile(ctx context.Context, req reconcile.Req
 	if c.er != nil {
 		if rr.Error != nil {
 			if rr.Cluster != nil {
-				c.er.Eventf(rr.Cluster, rr.ClusterConfig, corev1.EventTypeWarning, "ReconcileError", rr.defaultedEventAction(), "Reconcile failed: %v", rr.Error)
+				c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, "ReconcileError", rr.defaultedEventAction(), "Reconcile failed: %v", rr.Error)
 			}
 		} else {
 			if rr.Cluster != nil {
-				c.er.Eventf(rr.Cluster, rr.ClusterConfig, corev1.EventTypeNormal, "ReconcileSuccess", rr.defaultedEventAction(), "Reconcile successful")
+				c.er.Eventf(rr.Cluster, nil, corev1.EventTypeNormal, "ReconcileSuccess", rr.defaultedEventAction(), "Reconcile successful")
 			}
 		}
 	}
@@ -192,21 +191,24 @@ func (c *IPAMClusterController) handleCreateOrUpdate(ctx context.Context, rr Rec
 		if len(ir.AnnotationToApply) > 0 {
 			annotationValue, err := ir.AnnotationToApply.ToAnnotation()
 			if err != nil {
-				errs = errors.Join(errs, fmt.Errorf("unable to serialize applied rules annotation: %w", err))
+				errs = errors.Join(errs, fmt.Errorf("unable to serialize 'applied rules' annotation: %w", err))
 				if c.er != nil {
-					c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not convert CIDR annotation value into JSON: %s", err.Error())
+					c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not convert 'applied rules' annotation value into JSON: %s", err.Error())
 				}
 			}
-			log.Debug("Applying annotation to Cluster", "value", annotationValue)
-			old := rr.Cluster.DeepCopy()
-			if rr.Cluster.Annotations == nil {
-				rr.Cluster.Annotations = map[string]string{}
-			}
-			rr.Cluster.Annotations[ipamv1alpha1.AppliedRulesAnnotationKey] = annotationValue
-			if err := c.PlatformCluster.Client().Patch(ctx, rr.Cluster, client.MergeFrom(old)); err != nil {
-				errs = errors.Join(errs, fmt.Errorf("unable to update Cluster with applied rules annotation: %w", err))
-				if c.er != nil {
-					c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not update Cluster with applied rules annotation: %s", err.Error())
+			oldAnnotation := rr.Cluster.Annotations[ipamv1alpha1.AppliedRulesAnnotationKey]
+			if annotationValue != oldAnnotation {
+				log.Debug("Applying changed 'applied rules' annotation to Cluster", "value", annotationValue)
+				old := rr.Cluster.DeepCopy()
+				if rr.Cluster.Annotations == nil {
+					rr.Cluster.Annotations = map[string]string{}
+				}
+				rr.Cluster.Annotations[ipamv1alpha1.AppliedRulesAnnotationKey] = annotationValue
+				if err := c.PlatformCluster.Client().Patch(ctx, rr.Cluster, client.MergeFrom(old)); err != nil {
+					errs = errors.Join(errs, fmt.Errorf("unable to update Cluster with 'applied rules' annotation: %w", err))
+					if c.er != nil {
+						c.er.Eventf(rr.Cluster, nil, corev1.EventTypeWarning, EventReasonCIDRManagementError, EventActionApplyingChanges, "could not update Cluster with 'applied rules' annotation: %s", err.Error())
+					}
 				}
 			}
 		}
@@ -255,6 +257,10 @@ func (c *IPAMClusterController) handleDelete(ctx context.Context, req reconcile.
 	for _, cc := range ccs {
 		if err := shared.ReleaseCIDRsForClusterConfig(ctx, c.PlatformCluster.Client(), cc); err != nil {
 			errs = errors.Join(errs, fmt.Errorf("error trying to release CIDRs from ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
+		}
+		// we can delete even if the CIDR release failed, because the ClusterConfig will have a finalizer left in that case
+		if err := c.PlatformCluster.Client().Delete(ctx, cc); client.IgnoreNotFound(err) != nil {
+			errs = errors.Join(errs, fmt.Errorf("error trying to delete ClusterConfig '%s/%s': %w", cc.Namespace, cc.Name, err))
 		}
 	}
 
@@ -373,7 +379,7 @@ func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *cluste
 		}
 
 		if _, hasIssue := res.RulesWithIssues[rule.ID]; hasIssue {
-			log.Debug("Skipping CIDR injection rule due to issues", "id", rule.ID, "issue", res.RulesWithIssues[rule.ID])
+			log.Info("Skipping CIDR injection rule due to issues", "id", rule.ID, "issue", res.RulesWithIssues[rule.ID])
 			continue
 		}
 
@@ -384,13 +390,17 @@ func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *cluste
 			continue
 		}
 		res.AnnotationToApply[rule.ID] = injections
+		log.Info("Generated injections for rule", "ruleID", rule.ID, "injections", injections)
 
 		newCC, err := shared.GenerateClusterConfigForInjectionList(cl, rule.ID, injections)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("error generating ClusterConfig for injection rule '%s': %w", rule.ID, err))
 			continue
 		}
-		res.ClusterConfigsToCreate = append(res.ClusterConfigsToCreate, newCC)
+		if newCC != nil && newCC.Name != shared.EmptyClusterNamePlaceholder {
+			// do not create placeholder ClusterConfigs
+			res.ClusterConfigsToCreate = append(res.ClusterConfigsToCreate, newCC)
+		}
 	}
 
 	return res, EventActionCIDRGeneration, errors.Join(allErrs...)
