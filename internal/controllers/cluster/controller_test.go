@@ -350,6 +350,86 @@ var _ = Describe("Cluster Controller", Serial, func() {
 		Expect(cidrString).To(Equal(c0cidr))
 	})
 
+	It("should inject the same CIDR into all paths when both 'path' and 'paths' are set", func() {
+		env := defaultTestSetup("testdata", "test-04")
+
+		req := testutils.RequestFromStrings("cluster-path-and-paths", "test")
+		env.ShouldReconcile(req)
+
+		c := &clustersv1alpha1.Cluster{}
+		Expect(env.Client().Get(env.Ctx, client.ObjectKey{Name: "cluster-path-and-paths", Namespace: "test"}, c)).To(Succeed())
+
+		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(ccs).To(HaveLen(1))
+		verifyAppliedRulesAnnotationConsistency(env, c, ccs)
+
+		cc := ccs["path-and-paths"]
+		Expect(cc).ToNot(BeNil())
+		// one injection with 'path' + two 'paths' entries should produce three patches
+		Expect(cc.Spec.Patches).To(HaveLen(3))
+
+		cidrMatcher := WithTransform(func(j *apiextensionsv1.JSON) string {
+			var s string
+			Expect(json.Unmarshal(j.Raw, &s)).To(Succeed())
+			return s
+		}, And(HavePrefix("10.0."), HaveSuffix(".0/24")))
+
+		Expect(cc.Spec.Patches).To(ConsistOf(
+			MatchFields(IgnoreExtras, Fields{"Path": Equal("/spec/networking/nodes"), "Op": Equal("add"), "Value": cidrMatcher}),
+			MatchFields(IgnoreExtras, Fields{"Path": Equal("/spec/networking/pods"), "Op": Equal("add"), "Value": cidrMatcher}),
+			MatchFields(IgnoreExtras, Fields{"Path": Equal("/spec/networking/services"), "Op": Equal("add"), "Value": cidrMatcher}),
+		))
+
+		// all three patches must carry the exact same CIDR
+		cidrs := make([]string, len(cc.Spec.Patches))
+		for i, patch := range cc.Spec.Patches {
+			Expect(json.Unmarshal(patch.Value.Raw, &cidrs[i])).To(Succeed())
+		}
+		Expect(cidrs[0]).To(Equal(cidrs[1]))
+		Expect(cidrs[0]).To(Equal(cidrs[2]))
+	})
+
+	It("should inject the same CIDR into all paths when only 'paths' is set", func() {
+		env := defaultTestSetup("testdata", "test-04")
+
+		req := testutils.RequestFromStrings("cluster-paths-only", "test")
+		env.ShouldReconcile(req)
+
+		c := &clustersv1alpha1.Cluster{}
+		Expect(env.Client().Get(env.Ctx, client.ObjectKey{Name: "cluster-paths-only", Namespace: "test"}, c)).To(Succeed())
+
+		ccs, err := shared.FetchClusterConfigsForCluster(env.Ctx, env.Client(), c)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(ccs).To(HaveLen(1))
+		verifyAppliedRulesAnnotationConsistency(env, c, ccs)
+
+		cc := ccs["paths-only"]
+		Expect(cc).ToNot(BeNil())
+		// one injection with three 'paths' entries and no 'path' should produce three patches
+		Expect(cc.Spec.Patches).To(HaveLen(3))
+
+		cidrMatcher := WithTransform(func(j *apiextensionsv1.JSON) string {
+			var s string
+			Expect(json.Unmarshal(j.Raw, &s)).To(Succeed())
+			return s
+		}, And(HavePrefix("10.0."), HaveSuffix(".0/24")))
+
+		Expect(cc.Spec.Patches).To(ConsistOf(
+			MatchFields(IgnoreExtras, Fields{"Path": Equal("/spec/networking/nodes"), "Op": Equal("add"), "Value": cidrMatcher}),
+			MatchFields(IgnoreExtras, Fields{"Path": Equal("/spec/networking/pods"), "Op": Equal("add"), "Value": cidrMatcher}),
+			MatchFields(IgnoreExtras, Fields{"Path": Equal("/spec/networking/services"), "Op": Equal("add"), "Value": cidrMatcher}),
+		))
+
+		// all three patches must carry the exact same CIDR
+		cidrs := make([]string, len(cc.Spec.Patches))
+		for i, patch := range cc.Spec.Patches {
+			Expect(json.Unmarshal(patch.Value.Raw, &cidrs[i])).To(Succeed())
+		}
+		Expect(cidrs[0]).To(Equal(cidrs[1]))
+		Expect(cidrs[0]).To(Equal(cidrs[2]))
+	})
+
 	It("should not free any CIDRs if the Cluster still has finalizers", func() {
 		env := defaultTestSetup("testdata", "test-03")
 

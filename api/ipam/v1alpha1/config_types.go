@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clustersv1alpha1 "github.com/openmcp-project/openmcp-operator/api/clusters/v1alpha1"
@@ -43,6 +45,7 @@ type CIDRInjection struct {
 	Injections []SingleCIDRInjection `json:"injections"`
 }
 
+// +kubebuilder:validation:XValidation:rule="(has(self.path) && self.path.size() > 0) || (has(self.paths) && self.paths.size() > 0)",message="either 'path' must be non-empty or 'paths' must contain at least one entry"
 type SingleCIDRInjection struct {
 	// ID is an optional identifier for the CIDR.
 	// It can be used as value for 'parent' in a subsequent injection belonging to the same rule (the order of injections is important here).
@@ -51,9 +54,17 @@ type SingleCIDRInjection struct {
 	// Path is the JSONPath expression on where to inject the CIDR.
 	// This must either be a valid JSONPatch path expression or a JSONPath-like expression pointing to a single string field in the Cluster spec where the CIDR should be injected.
 	// See https://github.com/openmcp-project/controller-utils/blob/main/docs/libs/jsonpatch.md#path-notation for details on the supported path notation.
-	// +kubebuilder:validation:MinLength=1
-	// +required
-	Path string `json:"path"`
+	// Either 'path' or 'paths' must be specified.
+	// If both are specified, the CIDR will be injected into all specified paths.
+	// +optional
+	Path string `json:"path,omitempty"`
+	// Paths can be used instead of 'path' if the same CIDR should be injected into multiple fields in the Cluster spec. The same validation rules apply to the individual paths in this list as for 'path'.
+	// Either 'path' or 'paths' must be specified.
+	// If both 'path' and 'paths' are specified, the CIDR will be injected into all specified paths.
+	// +kubebuilder:validation:item:MinLength=1
+	// +kubebuilder:validation:uniqueItems=true
+	// +optional
+	Paths []string `json:"paths,omitempty"`
 	// Parents is a list of identifiers from the parent CIDR mapping that are allowed to be the parent of this CIDR.
 	// The list will be traversed in order, and the first parent CIDR with available capacity will be used as parent for this CIDR.
 	// If this list is empty, all parent CIDRs defined in the config are allowed parents for this CIDR. They will be traversed in an undefined order.
@@ -94,4 +105,28 @@ type IPAMConfigList struct {
 
 func init() {
 	SchemeBuilder.Register(&IPAMConfig{}, &IPAMConfigList{})
+}
+
+// GetPaths returns a list of all paths defined in this injection.
+func (sci *SingleCIDRInjection) GetPaths() []PathWithSource {
+	res := make([]PathWithSource, 0, len(sci.Paths)+1)
+	if sci.Path != "" {
+		res = append(res, PathWithSource{Path: sci.Path, Index: -1})
+	}
+	for i, p := range sci.Paths {
+		res = append(res, PathWithSource{Path: p, Index: i})
+	}
+	return res
+}
+
+type PathWithSource struct {
+	Path  string
+	Index int
+}
+
+func (pws *PathWithSource) Source() string {
+	if pws.Index < 0 {
+		return "path"
+	}
+	return fmt.Sprintf("paths[%d]", pws.Index)
 }

@@ -23,7 +23,9 @@ spec:
       values:
       - mcp
     injections:
-    - path: .spec.network.cidr
+    - paths:
+      - .spec.network.cidr
+      - .metadata.annotations[rootcidr]
       parents:
       - foo # refers to the 'foo' parent CIDR defined above
       - bar # refers to the 'bar' parent CIDR defined above
@@ -61,7 +63,8 @@ The purpose of the Gardener-IPAM platform service is to inject disjunct CIDRs in
   - `matchIdentities`/`matchPurposes`/`matchLabels`/`matchExpressions`: These fields allow specifing filters for which `Cluster` resources this rule should apply to. They are explained in more detail in the [corresponding section](#selectors) below.
   - `injections`: A list of CIDRs to slice and inject into the shoot manifest.
     - `id` *(optional)*: An optional identifier for the injection. This is only needed if the CIDR generated for this injection should serve as a parent CIDR for a subsequent injection and has no effect otherwise.
-    - `path`: The path within the shoot manifest where the CIDR should be injected. Supports JSONPatch (`/foo/bar/baz`) as well as a JSONPath-like (`.foo.bar.baz`) syntax, see [here](https://github.com/openmcp-project/controller-utils/blob/main/docs/libs/jsonpatch.md#patch-syntax) for further details.
+    - `path` *(either `path` or `paths` is required)*: The path within the shoot manifest where the CIDR should be injected. Supports JSONPatch (`/foo/bar/baz`) as well as a JSONPath-like (`.foo.bar.baz`) syntax, see [here](https://github.com/openmcp-project/controller-utils/blob/main/docs/libs/jsonpatch.md#patch-syntax) for further details.
+    - `paths`  *(either `path` or `paths` is required)*: This can be specified as an alternative (or in addition) to `path`, if the same CIDR should be injected into multiple paths.
     - `parents`: A list of parent CIDRs. The controller will traverse it from top to bottom and try to slice the requested child CIDR until it succeeds. In addition to the 'global' parent CIDRs from `spec.parentCIDRs`, also IDs from *previous injections of the same injection rule* can be used here, in which case the CIDR generated for the referenced injection will be used as a parent. If this list is empty, then all global parent CIDRs (but no local ones) are eligible and will be tried in an undefined order.
     - `subnetSize`: Defines the size of the requested CIDR. Note that this refers to the part after the `/` in the CIDR, meaning bigger values result in smaller IP ranges, with the maximum value of `32` resulting in a range consisting only of a single IP. Child CIDRs must be smaller than their parents, to take care to only reference parent CIDRs in the injection which have a smaller number at the end than defined here.
 
