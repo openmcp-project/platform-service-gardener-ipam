@@ -148,10 +148,26 @@ func validateInjections(injections []ipamv1alpha1.SingleCIDRInjection, parentIDs
 		}
 
 		// note that the same path can be specified with different notations, which is not detected here
-		if existingIndex, exists := pathsToIndices[injection.Path]; exists {
-			allErrs = append(allErrs, field.Invalid(ipath.Child("path"), injection.Path, fmt.Sprintf("injection injects into the same path as injection at index %d", existingIndex)))
-		} else {
-			pathsToIndices[injection.Path] = i
+		if len(injection.GetPaths()) == 0 {
+			allErrs = append(allErrs, field.Required(ipath, "at least one path must be specified, either via 'path' or via 'paths'"))
+		}
+		if len(injection.Path) > 0 {
+			if existingIndex, exists := pathsToIndices[injection.Path]; exists {
+				allErrs = append(allErrs, field.Invalid(ipath.Child("path"), injection.Path, fmt.Sprintf("injection injects into the same path as injection at index %d", existingIndex)))
+			} else {
+				pathsToIndices[injection.Path] = i
+			}
+		}
+		for j, path := range injection.Paths {
+			if existingIndex, exists := pathsToIndices[path]; exists {
+				if existingIndex == i {
+					allErrs = append(allErrs, field.Invalid(ipath.Child("paths").Index(j), path, "injection injects into the same path multiple times"))
+				} else {
+					allErrs = append(allErrs, field.Invalid(ipath.Child("paths").Index(j), path, fmt.Sprintf("injection injects into the same path as injection at index %d", existingIndex)))
+				}
+			} else {
+				pathsToIndices[path] = i
+			}
 		}
 
 		for j, parent := range injection.Parents {

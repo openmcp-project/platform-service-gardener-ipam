@@ -1,0 +1,10 @@
+apiVersion: clusters.openmcp.cloud/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-path-and-paths
+  namespace: test
+spec:
+  profile: garden-small
+  purposes:
+  - test-path-and-paths
+  tenancy: Shared

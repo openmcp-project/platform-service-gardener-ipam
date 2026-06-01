@@ -45,7 +45,7 @@ var _ = Describe("Config Validation Logic", func() {
 				}
 			}
 
-			args := []any{
+			args := []any{ // nolint:prealloc
 				func(cfg *ipamv1alpha1.IPAMConfig, expectedErrors []string) {
 					errs := webhooks.ValidateConfig(cfg)
 					if len(expectedErrors) == 0 {

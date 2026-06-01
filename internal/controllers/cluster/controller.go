@@ -358,23 +358,30 @@ func (c *IPAMClusterController) ManageInjections(ctx context.Context, cl *cluste
 		thisRulesPaths := sets.New[string]()
 		for i := range rule.Injections {
 			injection := &rule.Injections[i]
-			// normalize path for comparison
-			path, err := jsonpatch.ConvertPath(injection.Path)
-			if err != nil {
-				allErrs = append(allErrs, fmt.Errorf("error converting path '%s' from injection at index %d of rule '%s': %w", injection.Path, i, rule.ID, err))
-				continue
-			}
-			injection.Path = path
 
-			if thisRulesPaths.Has(path) {
-				res.RulesWithIssues[rule.ID] = fmt.Errorf("rule '%s' contains multiple injections for the same path '%s'", rule.ID, path)
-				break
-			}
-			thisRulesPaths.Insert(path)
-			if injectedPaths.Has(path) {
-				// path already used by another rule
-				res.RulesWithIssues[rule.ID] = fmt.Errorf("rule '%s' tries to inject into path '%s' which has already been used by another injection rule", rule.ID, path)
-				break
+			for _, pws := range injection.GetPaths() {
+				// normalize path for comparison
+				path, err := jsonpatch.ConvertPath(pws.Path)
+				if err != nil {
+					allErrs = append(allErrs, fmt.Errorf("error converting path '%s' from field '%s' in injection at index %d of rule '%s': %w", pws.Path, pws.Source(), i, rule.ID, err))
+					continue
+				}
+				if pws.Index < 0 {
+					injection.Path = path
+				} else {
+					injection.Paths[pws.Index] = path
+				}
+
+				if thisRulesPaths.Has(path) {
+					res.RulesWithIssues[rule.ID] = fmt.Errorf("rule '%s' contains multiple injections for the same path '%s'", rule.ID, path)
+					break
+				}
+				thisRulesPaths.Insert(path)
+				if injectedPaths.Has(path) {
+					// path already used by another rule
+					res.RulesWithIssues[rule.ID] = fmt.Errorf("rule '%s' tries to inject into path '%s' which has already been used by another injection rule", rule.ID, path)
+					break
+				}
 			}
 		}
 
@@ -423,6 +430,7 @@ func generateCIDRsForInjectionRule(ctx context.Context, rule *ipamv1alpha1.CIDRI
 			ilog.Debug("List of allowed parents is empty, using all globally defined parent CIDRs")
 			selectedParents = sets.KeySet(parentCIDRs).UnsortedList()
 		}
+		success := false
 		for _, parentID := range selectedParents {
 			plog := ilog.WithValues("parentID", parentID)
 			// try to find parent CIDR
@@ -444,7 +452,6 @@ func generateCIDRsForInjectionRule(ctx context.Context, rule *ipamv1alpha1.CIDRI
 					prefixes = append(prefixes, prefix)
 				}
 			}
-			success := false
 			for _, prefix := range prefixes {
 				// found possible parent prefix, try to acquire child prefix
 				plog.Debug("Found possible parent prefix, trying to acquire child prefix", "parentCIDR", prefix.Cidr)
@@ -454,7 +461,9 @@ func generateCIDRsForInjectionRule(ctx context.Context, rule *ipamv1alpha1.CIDRI
 					continue
 				}
 				plog.Debug("Successfully generated child CIDR", "childCidr", cPrefix.Cidr)
-				raw[injection.Path] = cPrefix
+				for _, pws := range injection.GetPaths() {
+					raw[pws.Path] = cPrefix
+				}
 				if injection.ID != "" {
 					tmpParents[injection.ID] = []*goipam.Prefix{cPrefix}
 				}
@@ -465,7 +474,7 @@ func generateCIDRsForInjectionRule(ctx context.Context, rule *ipamv1alpha1.CIDRI
 				break
 			}
 		}
-		if _, ok := raw[injection.Path]; !ok {
+		if !success {
 			// unable to generate CIDR for this injection
 			ilog.Debug("Unable to generate CIDR for rule")
 
@@ -476,7 +485,7 @@ func generateCIDRsForInjectionRule(ctx context.Context, rule *ipamv1alpha1.CIDRI
 				}
 			}
 
-			return nil, fmt.Errorf("unable to generate CIDR for injection %d (path '%s') from rule '%s'", injIdx, injection.Path, rule.ID)
+			return nil, fmt.Errorf("unable to generate CIDR for injection %d from rule '%s'", injIdx, rule.ID)
 		}
 	}
 

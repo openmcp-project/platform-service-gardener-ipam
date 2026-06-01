@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   labels:
     openmcp.cloud/cluster: platform
   name: ipamconfigs.gardener.clusters.openmcp.cloud
@@ -84,8 +84,17 @@ spec:
                               Path is the JSONPath expression on where to inject the CIDR.
                               This must either be a valid JSONPatch path expression or a JSONPath-like expression pointing to a single string field in the Cluster spec where the CIDR should be injected.
                               See https://github.com/openmcp-project/controller-utils/blob/main/docs/libs/jsonpatch.md#path-notation for details on the supported path notation.
-                            minLength: 1
+                              Either 'path' or 'paths' must be specified.
+                              If both are specified, the CIDR will be injected into all specified paths.
                             type: string
+                          paths:
+                            description: |-
+                              Paths can be used instead of 'path' if the same CIDR should be injected into multiple fields in the Cluster spec. The same validation rules apply to the individual paths in this list as for 'path'.
+                              Either 'path' or 'paths' must be specified.
+                              If both 'path' and 'paths' are specified, the CIDR will be injected into all specified paths.
+                            items:
+                              type: string
+                            type: array
                           subnetSize:
                             description: |-
                               SubnetSize is the desired size of the generated CIDR.
@@ -97,9 +106,13 @@ spec:
                             minimum: 0
                             type: integer
                         required:
-                        - path
                         - subnetSize
                         type: object
+                        x-kubernetes-validations:
+                        - message: either 'path' must be non-empty or 'paths' must
+                            contain at least one entry
+                          rule: (has(self.path) && self.path.size() > 0) || (has(self.paths)
+                            && self.paths.size() > 0)
                       type: array
                     matchExpressions:
                       description: matchExpressions is a list of label selector requirements.
