@@ -185,6 +185,30 @@ var _ = Describe("Shared Restore Functions", Serial, func() {
 			}
 		})
 
+		It("should correctly restore the same CIDR injected into multiple paths", func() {
+			env, _ := defaultTestSetup("testdata", "test-04")
+			Expect(shared.RestoreIPAMFromClusterState(env.Ctx, env.Client())).To(Succeed())
+
+			child10028 := "10.0.0.0/28"
+			child1001628 := "10.0.0.16/28"
+
+			// get all CIDRs
+			cidrStrings, err := shared.IPAM.ReadAllPrefixCidrs(env.Ctx)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cidrStrings).To(ConsistOf(parent10, child10024, child10028, child1001628))
+
+			for child, parent := range map[string]string{
+				parent10:     "",
+				child10024:   parent10,
+				child10028:   child10024,
+				child1001628: child10024,
+			} {
+				cidr, err := shared.IPAM.PrefixFrom(env.Ctx, child)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cidr.ParentCidr).To(Equal(parent))
+			}
+		})
+
 	})
 
 	Context("HandleOrphanedClusterConfigs", func() {
