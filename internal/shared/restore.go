@@ -355,7 +355,7 @@ func ipamFromClusterConfigs(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, c
 			// figure out the parent CIDR
 			parent, err := identifyParentPrefix(cidr, reverse(tmpParents), parents)
 			if err != nil {
-				return nil, fmt.Errorf("error identifying parent CIDR for '%s' (patch index %d): %w", cidr, idx, err)
+				return nil, fmt.Errorf("error identifying parent CIDR for '%s' (patch index %d in ClusterConfig '%s/%s'): %w", cidr, idx, cc.Namespace, cc.Name, err)
 			}
 			var child *goipam.Prefix
 			if parent == nil {
@@ -364,13 +364,18 @@ func ipamFromClusterConfigs(ctx context.Context, cfg *ipamv1alpha1.IPAMConfig, c
 				// In this case, we register the CIDR in the ipam state, but don't add it to the parent list, as it should not have any children outside of the following patches (which will be handled by the tmpParents list).
 				_, err = fetchOrNewPrefix(ctx, ipam, cidr)
 				if err != nil {
-					return nil, fmt.Errorf("error registering parentless prefix '%s' (patch index %d): %w", cidr, idx, err)
+					return nil, fmt.Errorf("error registering parentless prefix '%s' (patch index %d in ClusterConfig '%s/%s'): %w", cidr, idx, cc.Namespace, cc.Name, err)
 				}
 			} else {
+				if parent.Cidr == cidr {
+					// this can happen if the same CIDR is injected in multiple paths
+					// we can just skip it, as it's already registered
+					continue
+				}
 				// the CIDR has a registered parent, so let's register it as a child of the parent
 				child, err = ipam.AcquireSpecificChildPrefix(ctx, parent.Cidr, cidr)
 				if err != nil {
-					return nil, fmt.Errorf("error registering child prefix '%s' under parent '%s' (patch index %d): %w", cidr, parent.Cidr, idx, err)
+					return nil, fmt.Errorf("error registering child prefix '%s' under parent '%s' (patch index %d in ClusterConfig '%s/%s'): %w", cidr, parent.Cidr, idx, cc.Namespace, cc.Name, err)
 				}
 				tmpParents = append(tmpParents, child)
 			}
