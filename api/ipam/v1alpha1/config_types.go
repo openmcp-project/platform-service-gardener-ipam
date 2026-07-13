@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 
 	clustersv1alpha1 "github.com/openmcp-project/openmcp-operator/api/clusters/v1alpha1"
 )
@@ -104,7 +105,11 @@ type IPAMConfigList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&IPAMConfig{}, &IPAMConfigList{})
+	SchemeBuilder.Register(func(scheme *runtime.Scheme) error {
+		scheme.AddKnownTypes(GroupVersion, &IPAMConfig{}, &IPAMConfigList{})
+		return nil
+	})
+
 }
 
 // GetPaths returns a list of all paths defined in this injection.
