@@ -1,6 +1,6 @@
 module github.com/openmcp-project/platform-service-gardener-ipam
 
-go 1.26.4
+go 1.26.5
 
 replace github.com/openmcp-project/platform-service-gardener-ipam/api => ./api
 
@@ -9,15 +9,15 @@ require (
 	github.com/openmcp-project/cluster-provider-gardener/api v0.13.0
 	github.com/openmcp-project/controller-utils v0.30.0
 	github.com/openmcp-project/controller-utils/api v0.30.0
-	github.com/openmcp-project/openmcp-operator/api v1.1.0
-	github.com/openmcp-project/openmcp-operator/lib v1.1.0
+	github.com/openmcp-project/openmcp-operator/api v1.2.0
+	github.com/openmcp-project/openmcp-operator/lib v1.2.0
 	github.com/openmcp-project/platform-service-gardener-ipam/api v0.2.2
 	github.com/spf13/cobra v1.10.2
 	k8s.io/api v0.36.2
 	k8s.io/apiextensions-apiserver v0.36.2
 	k8s.io/apimachinery v0.36.2
 	k8s.io/client-go v0.36.2
-	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
+	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -81,8 +81,8 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/onsi/ginkgo/v2 v2.31.0
-	github.com/onsi/gomega v1.42.0
+	github.com/onsi/ginkgo/v2 v2.32.0
+	github.com/onsi/gomega v1.42.1
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -129,9 +129,9 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.46.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d // indirect
-	google.golang.org/grpc v1.81.1 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
+	google.golang.org/grpc v1.82.0 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
