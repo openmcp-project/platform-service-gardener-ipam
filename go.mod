@@ -9,7 +9,7 @@ require (
 	github.com/openmcp-project/cluster-provider-gardener/api v0.13.0
 	github.com/openmcp-project/controller-utils v0.31.0
 	github.com/openmcp-project/controller-utils/api v0.31.0
-	github.com/openmcp-project/openmcp-operator/api v1.2.0
+	github.com/openmcp-project/openmcp-operator/api v1.3.0
 	github.com/openmcp-project/openmcp-operator/lib v1.2.0
 	github.com/openmcp-project/platform-service-gardener-ipam/api v0.2.2
 	github.com/spf13/cobra v1.10.2
