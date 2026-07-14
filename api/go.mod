@@ -3,9 +3,9 @@ module github.com/openmcp-project/platform-service-gardener-ipam/api
 go 1.26.5
 
 require (
-	github.com/openmcp-project/cluster-provider-gardener/api v0.13.0
+	github.com/openmcp-project/cluster-provider-gardener/api v0.14.0
 	github.com/openmcp-project/controller-utils v0.31.0
-	github.com/openmcp-project/openmcp-operator/api v1.2.0
+	github.com/openmcp-project/openmcp-operator/api v1.3.0
 	k8s.io/apiextensions-apiserver v0.36.2
 	k8s.io/apimachinery v0.36.2
 	k8s.io/client-go v0.36.2
@@ -21,7 +21,7 @@ require (
 	github.com/fluxcd/pkg/apis/kustomize v1.20.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
-	github.com/gardener/gardener/pkg/apis v1.145.0 // indirect
+	github.com/gardener/gardener/pkg/apis v1.146.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.23.1 // indirect
