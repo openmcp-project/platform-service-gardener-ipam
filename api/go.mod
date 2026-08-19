@@ -1,6 +1,6 @@
 module github.com/openmcp-project/platform-service-gardener-ipam/api
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/openmcp-project/cluster-provider-gardener/api v0.14.0
