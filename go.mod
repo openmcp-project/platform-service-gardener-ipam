@@ -13,7 +13,7 @@ require (
 	github.com/openmcp-project/controller-utils/api v0.33.0
 	github.com/openmcp-project/openmcp-operator/api v1.4.0
 	github.com/openmcp-project/openmcp-operator/lib v1.4.0
-	github.com/openmcp-project/platform-service-gardener-ipam/api v0.3.0
+	github.com/openmcp-project/platform-service-gardener-ipam/api v0.4.0
 	github.com/spf13/cobra v1.10.2
 	k8s.io/api v0.37.0
 	k8s.io/apiextensions-apiserver v0.37.0
