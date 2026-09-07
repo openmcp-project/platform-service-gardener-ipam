@@ -1,6 +1,6 @@
 module github.com/openmcp-project/platform-service-gardener-ipam
 
-go 1.27.0
+go 1.27.1
 
 replace github.com/openmcp-project/platform-service-gardener-ipam/api => ./api
 
