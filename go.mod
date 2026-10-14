@@ -9,10 +9,10 @@ require (
 	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.44.0
 	github.com/openmcp-project/cluster-provider-gardener/api v0.16.1
-	github.com/openmcp-project/controller-utils v0.33.1
-	github.com/openmcp-project/controller-utils/api v0.33.1
-	github.com/openmcp-project/openmcp-operator/api v1.4.1
-	github.com/openmcp-project/openmcp-operator/lib v1.4.1
+	github.com/openmcp-project/controller-utils v0.33.2
+	github.com/openmcp-project/controller-utils/api v0.33.2
+	github.com/openmcp-project/openmcp-operator/api v1.4.2
+	github.com/openmcp-project/openmcp-operator/lib v1.4.2
 	github.com/openmcp-project/platform-service-gardener-ipam/api v0.4.1
 	github.com/spf13/cobra v1.10.2
 	k8s.io/api v0.37.1
@@ -41,7 +41,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
-	github.com/fluxcd/pkg/apis/kustomize v1.20.0 // indirect
+	github.com/fluxcd/pkg/apis/kustomize v1.21.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/gardener/gardener/pkg/apis v1.151.0 // indirect
