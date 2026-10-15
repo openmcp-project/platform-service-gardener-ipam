@@ -67,10 +67,10 @@ github.com/fluxcd/pkg/apis/kustomize v1.21.0 h1:dNR/mcuEdziBQKH2bG/B1X6MmASFv9ij
 github.com/fluxcd/pkg/apis/kustomize v1.21.0/go.mod h1:cN3wx9ZwzYkjYJ2ugTA7yjiW19IirZxiEwZhu4SFxyc=
 github.com/fsnotify/fsnotify v1.10.1 h1:b0/UzAf9yR5rhf3RPm9gf3ehBPpf0oZKIjtpKrx59Ho=
 github.com/fsnotify/fsnotify v1.10.1/go.mod h1:TLheqan6HD6GBK6PrDWyDPBaEV8LspOxvPSjC+bVfgo=
-github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh78=
-github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
-github.com/gardener/gardener/pkg/apis v1.151.0 h1:rkiSLkECk5IQ9pL74MP9tRAZZRDrvfkEXEByqMkM/Ms=
-github.com/gardener/gardener/pkg/apis v1.151.0/go.mod h1:DkM1g18b96V6Q8OT4sIsA/ILXihRrFz/RLuYObgEgmY=
+github.com/fxamacker/cbor/v2 v2.9.4 h1:xwjVlxEMR3S605oUlgBjKLTTeGFciYPGYCtF/35LKGo=
+github.com/fxamacker/cbor/v2 v2.9.4/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
+github.com/gardener/gardener/pkg/apis v1.153.0 h1:xpfMMPIjP0z8F61URH5f868MpkjhenrhPeMpQ4YiwYo=
+github.com/gardener/gardener/pkg/apis v1.153.0/go.mod h1:KB8DbLjix1SO81uaHGNIcHcBV5awnnLGXMNulp5YaBo=
 github.com/gkampitakis/ciinfo v0.3.2 h1:JcuOPk8ZU7nZQjdUhctuhQofk7BGHuIy0c9Ez8BNhXs=
 github.com/gkampitakis/ciinfo v0.3.2/go.mod h1:1NIwaOcFChN4fa/B0hEBdAb6npDlFL8Bwx4dfRLRqAo=
 github.com/gkampitakis/go-diff v1.3.2 h1:Qyn0J9XJSDTgnsgHRdz9Zp24RaJeKMUHg2+PDZZdC4M=
@@ -214,8 +214,8 @@ github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
 github.com/opencontainers/image-spec v1.1.1/go.mod h1:qpqAh3Dmcf36wStyyWU+kCeDgrGnAve2nCC8+7h8Q0M=
-github.com/openmcp-project/cluster-provider-gardener/api v0.16.1 h1:5er5jZF+SDbDTph5nOYJrnLniaPpFH1aaEAeGQVx5Bs=
-github.com/openmcp-project/cluster-provider-gardener/api v0.16.1/go.mod h1:ZN1RlKGStLe98l0Bv1o9dYeRSkSXZbPZhXdK505z5Uo=
+github.com/openmcp-project/cluster-provider-gardener/api v0.16.2 h1:cFEmnA3y3k+sjPsz3X3yUnHP0zJlNOMjsf40kE1gU44=
+github.com/openmcp-project/cluster-provider-gardener/api v0.16.2/go.mod h1:XsqTQOwt6ZIPGZ7lUjqi7z5Y4YBTrOjlGMLVqoY0rQw=
 github.com/openmcp-project/controller-utils v0.33.2 h1:uanfYESayx6JALKor3wkIjja3Hq1pTq1VGB/KKPlCgY=
 github.com/openmcp-project/controller-utils v0.33.2/go.mod h1:hwfKYzTzYjC2vI0q7e1EE35UuPzJJ2gk4GK01x21GyI=
 github.com/openmcp-project/controller-utils/api v0.33.2 h1:y7N5aAwP/SENgdKCDzwaBw2jeTaDShgAx6jG77N1buc=
