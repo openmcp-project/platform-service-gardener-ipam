@@ -8,7 +8,7 @@ require (
 	github.com/metal-stack/go-ipam v1.16.0
 	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.44.0
-	github.com/openmcp-project/cluster-provider-gardener/api v0.16.1
+	github.com/openmcp-project/cluster-provider-gardener/api v0.16.2
 	github.com/openmcp-project/controller-utils v0.33.2
 	github.com/openmcp-project/controller-utils/api v0.33.2
 	github.com/openmcp-project/openmcp-operator/api v1.4.2
@@ -43,8 +43,8 @@ require (
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fluxcd/pkg/apis/kustomize v1.21.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
-	github.com/gardener/gardener/pkg/apis v1.151.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
+	github.com/gardener/gardener/pkg/apis v1.153.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
