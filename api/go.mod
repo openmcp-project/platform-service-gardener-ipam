@@ -3,8 +3,8 @@ module github.com/openmcp-project/platform-service-gardener-ipam/api
 go 1.27.2
 
 require (
-	github.com/openmcp-project/cluster-provider-gardener/api v0.16.2
-	github.com/openmcp-project/controller-utils v0.33.2
+	github.com/openmcp-project/cluster-provider-gardener/api v0.16.3
+	github.com/openmcp-project/controller-utils v0.33.3
 	github.com/openmcp-project/openmcp-operator/api v1.4.2
 	k8s.io/apiextensions-apiserver v0.37.1
 	k8s.io/apimachinery v0.37.1
@@ -44,7 +44,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/openmcp-project/controller-utils/api v0.33.2 // indirect
+	github.com/openmcp-project/controller-utils/api v0.33.3 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.24.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
