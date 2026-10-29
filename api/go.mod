@@ -3,9 +3,9 @@ module github.com/openmcp-project/platform-service-gardener-ipam/api
 go 1.27.3
 
 require (
-	github.com/openmcp-project/cluster-provider-gardener/api v0.16.4
+	github.com/openmcp-project/cluster-provider-gardener/api v0.16.5
 	github.com/openmcp-project/controller-utils v0.33.3
-	github.com/openmcp-project/openmcp-operator/api v1.4.3
+	github.com/openmcp-project/openmcp-operator/api v1.4.4
 	k8s.io/apiextensions-apiserver v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.1
