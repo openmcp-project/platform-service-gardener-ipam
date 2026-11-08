@@ -6,7 +6,7 @@ replace github.com/openmcp-project/platform-service-gardener-ipam/api => ./api
 
 require (
 	github.com/metal-stack/go-ipam v1.16.0
-	github.com/onsi/ginkgo/v2 v2.33.1
+	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/openmcp-project/cluster-provider-gardener/api v0.16.5
 	github.com/openmcp-project/controller-utils v0.33.3
